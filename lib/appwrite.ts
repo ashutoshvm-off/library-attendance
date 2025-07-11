@@ -49,6 +49,7 @@ export class AppwriteService {
   private staffCollectionId: string
   private loginRecordsCollectionId: string
   private isConfigured = false
+  private connectionTested = false
 
   constructor() {
     this.databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || "library-db"
@@ -60,7 +61,7 @@ export class AppwriteService {
     this.initializeAppwrite()
   }
 
-  private initializeAppwrite() {
+  private async initializeAppwrite() {
     try {
       const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT
       const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
@@ -74,12 +75,36 @@ export class AppwriteService {
       this.client.setEndpoint(endpoint).setProject(projectId)
       this.databases = new Databases(this.client)
       this.account = new Account(this.client)
-      this.isConfigured = true
 
-      console.log("Appwrite initialized successfully")
+      // Test the connection
+      await this.testConnection()
+      
+      this.isConfigured = true
+      console.log("Appwrite initialized and connected successfully")
     } catch (error) {
       console.error("Failed to initialize Appwrite:", error)
       this.isConfigured = false
+    }
+  }
+
+  private async testConnection(): Promise<void> {
+    if (this.connectionTested) return
+
+    try {
+      if (!this.databases) throw new Error("Databases not initialized")
+      
+      // Try to list documents from any collection to test connection
+      await this.databases.listDocuments(
+        this.databaseId,
+        this.recordsCollectionId,
+        [Query.limit(1)]
+      )
+      
+      this.connectionTested = true
+      console.log("Appwrite connection test successful")
+    } catch (error) {
+      console.error("Appwrite connection test failed:", error)
+      throw error
     }
   }
 
@@ -356,7 +381,9 @@ export class AppwriteService {
   async createRecord(record: Omit<LibraryRecord, "$id">): Promise<LibraryRecord> {
     if (this.isConfigured && this.databases) {
       try {
-        // Remove any metadata fields before sending to Appwrite
+        // Test connection first
+        await this.testConnection()
+        
         const { $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanRecord } = record as any
         
         const response = await this.databases.createDocument(
@@ -365,13 +392,24 @@ export class AppwriteService {
           ID.unique(),
           cleanRecord,
         )
+        
+        console.log("Record created successfully in Appwrite:", response.$id)
         return response as unknown as LibraryRecord
       } catch (error) {
-        console.error("Appwrite error, falling back to localStorage:", error)
+        console.error("Appwrite createRecord error:", error)
+        if (error instanceof Error) {
+          console.error("Error details:", {
+            message: error.message,
+            name: error.name,
+            stack: error.stack
+          })
+        }
+        // Fall back to localStorage
       }
     }
 
     // Fallback to localStorage
+    console.log("Using localStorage fallback for record creation")
     const newRecord: LibraryRecord = {
       $id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...record,
@@ -437,17 +475,29 @@ export class AppwriteService {
   async getRecordsByDate(date: string): Promise<LibraryRecord[]> {
     if (this.isConfigured && this.databases) {
       try {
+        await this.testConnection()
+        
         const response = await this.databases.listDocuments(this.databaseId, this.recordsCollectionId, [
           Query.equal("date", date),
           Query.orderDesc("checkInTime"),
         ])
+        
+        console.log(`Fetched ${response.documents.length} records from Appwrite for date ${date}`)
         return response.documents as unknown as LibraryRecord[]
       } catch (error) {
-        console.error("Appwrite error, falling back to localStorage:", error)
+        console.error("Appwrite getRecordsByDate error:", error)
+        if (error instanceof Error) {
+          console.error("Error details:", {
+            message: error.message,
+            name: error.name
+          })
+        }
+        // Fall back to localStorage
       }
     }
 
     // Fallback to localStorage
+    console.log("Using localStorage fallback for getting records by date")
     const records = this.getLocalData<LibraryRecord>("records")
     return records
       .filter((record) => record.date === date)
@@ -621,18 +671,49 @@ export class AppwriteService {
     return this.isConfigured
   }
 
-  // Get connection status
-  getConnectionStatus(): { isConnected: boolean; message: string } {
-    if (this.isConfigured) {
+  // Enhanced connection status
+  getConnectionStatus(): { isConnected: boolean; message: string; details?: any } {
+    if (this.isConfigured && this.connectionTested) {
       return {
         isConnected: true,
         message: "Connected to Appwrite Cloud",
+        details: {
+          endpoint: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
+          projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID?.substring(0, 8) + "...",
+          database: this.databaseId
+        }
+      }
+    } else if (this.isConfigured && !this.connectionTested) {
+      return {
+        isConnected: false,
+        message: "Appwrite configured but connection not tested",
+        details: {
+          endpoint: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
+          projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID?.substring(0, 8) + "..."
+        }
       }
     } else {
       return {
         isConnected: false,
         message: "Running in Demo Mode (Local Storage)",
+        details: {
+          reason: "Environment variables not configured"
+        }
       }
+    }
+  }
+
+  // Add method to manually retry connection
+  async retryConnection(): Promise<boolean> {
+    this.connectionTested = false
+    this.isConfigured = false
+    
+    try {
+      await this.initializeAppwrite()
+      return this.isConfigured
+    } catch (error) {
+      console.error("Connection retry failed:", error)
+      return false
     }
   }
 }

@@ -597,95 +597,151 @@ Staff (1) ←→ (Many) LoginRecords
 ## 🚀 Deployment
 
 ### Vercel (Recommended)
-1. Push code to GitHub
-2. Connect repository to Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy automatically
 
-### Other Platforms
-- **Netlify:** Works with static export
-- **Railway:** Full-stack deployment
-- **Docker:** Container deployment ready
+1. **Push code to GitHub**
+   ```bash
+   git add .
+   git commit -m "Deploy to Vercel"
+   git push origin main
+   ```
 
-## 🛠️ Development
+2. **Connect repository to Vercel**
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
+   - Click "New Project"
+   - Import your GitHub repository
+   - Configure project settings
 
-### Project Structure
-\`\`\`
-├── app/                    # Next.js app directory
-│   ├── admin/             # Admin panel pages
-│   └── globals.css        # Global styles
-├── components/            # React components
-│   ├── ui/               # shadcn/ui components
-│   ├── auth-context.tsx  # Authentication + login tracking
-│   ├── dashboard.tsx     # Main dashboard
-│   └── admin-panel.tsx   # Admin interface + login history
-├── lib/                  # Utilities
-│   └── appwrite.ts       # Appwrite service + login records
-└── scripts/              # Database scripts
-\`\`\`
+3. **Add environment variables in Vercel dashboard**
+   - Go to Project Settings → Environment Variables
+   - Add each variable:
+   
+   ```env
+   NEXT_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+   NEXT_PUBLIC_APPWRITE_PROJECT_ID=686f3b60002d25d1e005
+   NEXT_PUBLIC_APPWRITE_DATABASE_ID=library-db
+   NEXT_PUBLIC_APPWRITE_RECORDS_COLLECTION_ID=records
+   NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID=students
+   NEXT_PUBLIC_APPWRITE_STAFF_COLLECTION_ID=staff
+   NEXT_PUBLIC_APPWRITE_LOGIN_RECORDS_COLLECTION_ID=login-records
+   ```
 
-### Available Scripts
-\`\`\`bash
-npm run dev          # Development server
-npm run build        # Production build
-npm run start        # Production server
-npm run lint         # ESLint check
-npm run type-check   # TypeScript check
-\`\`\`
+4. **Deploy automatically**
+   - Vercel will automatically deploy
+   - Check deployment logs for any errors
+   - Test the connection status in your deployed app
 
-## 📈 Roadmap
+### Vercel Deployment Troubleshooting
 
-### Upcoming Features
-- [ ] **Mobile App** (React Native)
-- [ ] **Email Notifications** for overdue returns
-- [ ] **Book Management** system
-- [ ] **Fine Management** and payments
-- [ ] **Advanced Analytics** with charts
-- [ ] **Multi-library Support**
-- [ ] **API Documentation**
-- [ ] **Automated Backups**
-- [ ] **Advanced Login Analytics** (location tracking, device fingerprinting)
+**1. Environment Variables Not Working**
+- ✅ Ensure all variables start with `NEXT_PUBLIC_`
+- ✅ Double-check variable names match exactly
+- ✅ Redeploy after adding variables
+- ✅ Check Vercel deployment logs
 
-### Integrations
-- [ ] **Barcode Hardware** integration
-- [ ] **RFID Support** for contactless scanning
-- [ ] **SMS Notifications**
-- [ ] **Google Calendar** sync
-- [ ] **Slack/Teams** notifications
-- [ ] **LDAP/Active Directory** integration
+**2. Appwrite Connection Issues**
+- ✅ Use global endpoint: `https://cloud.appwrite.io/v1`
+- ✅ Verify project ID is correct
+- ✅ Check Appwrite console for API errors
+- ✅ Test connection from Vercel deployment
 
-## 🤝 Contributing
+**3. CORS Issues**
+- ✅ Add your Vercel domain to Appwrite project platforms
+- ✅ Go to Appwrite Console → Your Project → Settings → Platforms
+- ✅ Add Web Platform with your Vercel URL (e.g., `https://your-app.vercel.app`)
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+**4. Function Timeout Issues**
+- ✅ Appwrite queries have built-in timeouts
+- ✅ Check Vercel function logs for timeout errors
+- ✅ Consider implementing retry logic
 
-## 📄 License
+### Adding Vercel Domain to Appwrite
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+1. **Go to Appwrite Console**
+2. **Select your project**
+3. **Go to Settings → Platforms**
+4. **Click "Add Platform"**
+5. **Select "Web App"**
+6. **Add your domains:**
+   ```
+   https://your-app.vercel.app
+   https://your-app-git-main-username.vercel.app
+   localhost:3000 (for development)
+   ```
 
-## 🙏 Acknowledgments
+### Vercel Environment Variables Setup
 
-- **Next.js** - React framework
-- **Appwrite** - Backend as a Service
-- **shadcn/ui** - UI component library
-- **Tailwind CSS** - Utility-first CSS
-- **Lucide React** - Icon library
+```bash
+# In Vercel Dashboard → Project Settings → Environment Variables
 
-## 📞 Support
+# Variable Name: NEXT_PUBLIC_APPWRITE_ENDPOINT
+# Value: https://cloud.appwrite.io/v1
+# Environment: Production, Preview, Development
 
-### Getting Help
-1. Check this README for common issues
-2. Review browser console for errors
-3. Verify Appwrite configuration
-4. Test with demo mode first
+# Variable Name: NEXT_PUBLIC_APPWRITE_PROJECT_ID  
+# Value: 686f3b60002d25d1e005
+# Environment: Production, Preview, Development
 
-### Contact
-- **Email:** support@libraryos.com
-- **GitHub Issues:** [Create an issue](https://github.com/your-repo/issues)
-- **Documentation:** [Full docs](https://docs.libraryos.com)
+# Variable Name: NEXT_PUBLIC_APPWRITE_DATABASE_ID
+# Value: library-db
+# Environment: Production, Preview, Development
+
+# Variable Name: NEXT_PUBLIC_APPWRITE_RECORDS_COLLECTION_ID
+# Value: records
+# Environment: Production, Preview, Development
+
+# Variable Name: NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID
+# Value: students
+# Environment: Production, Preview, Development
+
+# Variable Name: NEXT_PUBLIC_APPWRITE_STAFF_COLLECTION_ID
+# Value: staff
+# Environment: Production, Preview, Development
+
+# Variable Name: NEXT_PUBLIC_APPWRITE_LOGIN_RECORDS_COLLECTION_ID
+# Value: login-records
+# Environment: Production, Preview, Development
+```
+
+## 🐛 Troubleshooting
+
+### Vercel Deployment Issues
+
+**1. Appwrite Not Working on Vercel**
+- ✅ Check environment variables are properly set in Vercel dashboard
+- ✅ Ensure all variables start with `NEXT_PUBLIC_`
+- ✅ Use global Appwrite endpoint: `https://cloud.appwrite.io/v1`
+- ✅ Add Vercel domain to Appwrite platforms
+- ✅ Check browser console for CORS errors
+- ✅ Verify project ID is correct
+
+**2. Connection Status Shows "Demo Mode" on Vercel**
+- ✅ Environment variables not properly configured
+- ✅ Check Vercel deployment logs
+- ✅ Ensure variables are added to all environments (Production, Preview, Development)
+- ✅ Redeploy after adding environment variables
+
+**3. "Failed to fetch" Errors on Vercel**
+- ✅ CORS issue - add Vercel domain to Appwrite platforms
+- ✅ Network connectivity issue - check Vercel function logs
+- ✅ Wrong endpoint URL - verify in environment variables
+- ✅ Project ID mismatch - double-check in Appwrite console
+
+**4. Environment Variables Not Loading**
+```javascript
+// Add this to debug in your deployed app
+console.log("Environment variables check:", {
+  endpoint: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
+  projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID,
+  hasEndpoint: !!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
+  hasProjectId: !!process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
+})
+```
+
+**5. Deployment Succeeds but App Doesn't Work**
+- ✅ Check browser console for JavaScript errors
+- ✅ Verify API calls in Network tab
+- ✅ Test locally with same environment variables
+- ✅ Check Vercel function logs for server-side errors
 
 ---
 
