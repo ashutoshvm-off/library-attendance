@@ -150,13 +150,31 @@ export function Dashboard({ staff }: DashboardProps) {
     setIsScanning(true)
     try {
       const today = format(new Date(), "yyyy-MM-dd")
-      const existingRecord = records.find(
-        (record) => record.admissionId === barcode && record.date === today && record.status === "checked-in",
+      
+      // Get fresh records to ensure we have the latest data
+      const todaysRecords = await appwriteService.getRecordsByDate(today)
+      
+      // Find any existing record for this student today
+      const existingRecord = todaysRecords.find(
+        (record) => record.admissionId === barcode.trim() && record.date === today
       )
 
-      if (existingRecord) {
-        await handleCheckOut(existingRecord)
+      // Sort records by time to get the most recent one
+      const studentRecordsToday = todaysRecords
+        .filter(record => record.admissionId === barcode.trim() && record.date === today)
+        .sort((a, b) => {
+          const timeA = new Date(a.checkInTime || a.date).getTime()
+          const timeB = new Date(b.checkInTime || b.date).getTime()
+          return timeB - timeA // Most recent first
+        })
+
+      const mostRecentRecord = studentRecordsToday[0]
+
+      if (mostRecentRecord && mostRecentRecord.status === "checked-in") {
+        // Student is currently checked in, so check them out
+        await handleCheckOut(mostRecentRecord)
       } else {
+        // Student is not checked in (or no record exists), so check them in
         await handleCheckIn()
       }
     } catch (error) {
@@ -173,13 +191,32 @@ export function Dashboard({ staff }: DashboardProps) {
 
   const handleCheckIn = async () => {
     try {
-      const studentData = await appwriteService.getStudentByAdmissionId(barcode)
+      const today = format(new Date(), "yyyy-MM-dd")
+      
+      // Double-check that student isn't already checked in
+      const existingCheckedIn = records.find(
+        (record) => record.admissionId === barcode.trim() && 
+                   record.date === today && 
+                   record.status === "checked-in"
+      )
+
+      if (existingCheckedIn) {
+        toast({
+          title: "Already Checked In",
+          description: `${existingCheckedIn.studentName} is already checked in today`,
+          variant: "destructive",
+        })
+        setBarcode("")
+        return
+      }
+
+      const studentData = await appwriteService.getStudentByAdmissionId(barcode.trim())
 
       const newRecord: LibraryRecord = {
-        admissionId: barcode,
-        studentName: studentData?.name || `Student ${barcode}`,
+        admissionId: barcode.trim(),
+        studentName: studentData?.name || `Student ${barcode.trim()}`,
         checkInTime: new Date().toISOString(),
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: today,
         status: "checked-in",
       }
 
@@ -194,7 +231,7 @@ export function Dashboard({ staff }: DashboardProps) {
 
       // Update the displayed student info after successful scan
       setDisplayedStudentName(newRecord.studentName)
-      setDisplayedStudentId(barcode)
+      setDisplayedStudentId(barcode.trim())
       setShowStudentCard(true)
 
       // Start the 5-second hide timer
@@ -220,6 +257,17 @@ export function Dashboard({ staff }: DashboardProps) {
 
   const handleCheckOut = async (record: LibraryRecord) => {
     try {
+      // Ensure we're checking out the correct record
+      if (record.status !== "checked-in") {
+        toast({
+          title: "Invalid Operation",
+          description: `${record.studentName} is not currently checked in`,
+          variant: "destructive",
+        })
+        setBarcode("")
+        return
+      }
+
       const updatedRecord = {
         ...record,
         checkOutTime: new Date().toISOString(),
@@ -237,7 +285,7 @@ export function Dashboard({ staff }: DashboardProps) {
 
       // Update the displayed student info after successful scan
       setDisplayedStudentName(record.studentName)
-      setDisplayedStudentId(barcode)
+      setDisplayedStudentId(barcode.trim())
       setShowStudentCard(true)
 
       // Start the 5-second hide timer

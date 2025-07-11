@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "@/hooks/use-toast"
 import { UserCheck, UserX } from "lucide-react"
 import { format } from "date-fns"
-import { AppwriteService } from "@/lib/appwrite"
+import { EnhancedAppwriteService } from "@/lib/appwrite-enhanced"
 import { AuthProvider, useAuth } from "@/components/auth-context"
 import LoginScreen from "@/components/login-screen"
 import { Dashboard } from "@/components/dashboard"
@@ -27,7 +27,7 @@ function LibraryManagementContent() {
   const [records, setRecords] = useState<LibraryRecord[]>([])
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [loading, setLoading] = useState(false)
-  const [appwriteService] = useState(() => new AppwriteService())
+  const [appwriteService] = useState(() => new EnhancedAppwriteService())
 
   const [isAppwriteConfigured, setIsAppwriteConfigured] = useState(false)
 
@@ -69,17 +69,16 @@ function LibraryManagementContent() {
 
     setIsScanning(true)
     try {
-      // Check if student is already checked in today
       const today = format(new Date(), "yyyy-MM-dd")
-      const existingRecord = records.find(
-        (record) => record.admissionId === barcode && record.date === today && record.status === "checked-in",
-      )
-
-      if (existingRecord) {
-        // Check out
-        await handleCheckOut(existingRecord)
+      
+      // Get the current status of the student
+      const studentStatus = await appwriteService.getStudentCurrentStatus(barcode.trim(), today)
+      
+      if (studentStatus?.isCheckedIn && studentStatus.lastRecord) {
+        // Student is currently checked in, so check them out
+        await handleCheckOut(studentStatus.lastRecord)
       } else {
-        // Check in
+        // Student is not checked in, so check them in
         await handleCheckIn()
       }
     } catch (error) {
@@ -96,27 +95,45 @@ function LibraryManagementContent() {
 
   const handleCheckIn = async () => {
     try {
-      const studentData = await appwriteService.getStudentByAdmissionId(barcode)
+      const today = format(new Date(), "yyyy-MM-dd")
+      
+      // Double-check that student isn't already checked in
+      const todaysRecords = await appwriteService.getRecordsByDate(today)
+      const existingCheckedIn = todaysRecords.find(
+        (record) => record.admissionId === barcode.trim() && 
+                   record.date === today && 
+                   record.status === "checked-in"
+      )
+
+      if (existingCheckedIn) {
+        toast({
+          title: "Already Checked In",
+          description: `Student is already checked in today`,
+          variant: "destructive",
+        })
+        setBarcode("")
+        return
+      }
+
+      const studentData = await appwriteService.getStudentByAdmissionId(barcode.trim())
 
       const newRecord: LibraryRecord = {
-        admissionId: barcode,
-        studentName: studentData?.name || `Student ${barcode}`,
+        admissionId: barcode.trim(),
+        studentName: studentData?.name || `Student ${barcode.trim()}`,
         checkInTime: new Date().toISOString(),
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: today,
         status: "checked-in",
       }
 
-      const savedRecord = await appwriteService.createRecord(newRecord)
+      await appwriteService.createRecord(newRecord)
 
       toast({
         title: "Check-in Successful",
         description: `${newRecord.studentName} checked in at ${format(new Date(), "HH:mm:ss")}`,
       })
 
-      // Refresh page after successful check-in
-      setTimeout(() => {
-        window.location.reload()
-      }, 1500)
+      setBarcode("")
+      loadRecords()
     } catch (error) {
       console.error("Error during check-in:", error)
       toast({

@@ -144,6 +144,19 @@ export class EnhancedAppwriteService {
 
   // Enhanced record methods with offline support
   async createRecord(record: Omit<LibraryRecord, "$id">): Promise<LibraryRecord> {
+    // Check for existing record to prevent duplicates
+    const existingRecords = await this.getRecordsByDate(record.date)
+    const duplicateRecord = existingRecords.find(
+      r => r.admissionId === record.admissionId && 
+           r.date === record.date && 
+           r.status === record.status
+    )
+
+    if (duplicateRecord) {
+      console.warn("Duplicate record detected, returning existing record")
+      return duplicateRecord
+    }
+
     const localId = this.generateLocalId()
     const newRecord: LibraryRecord = {
       $id: localId,
@@ -537,6 +550,29 @@ export class EnhancedAppwriteService {
         isConnected: false,
         message: "Offline Mode - Data saved locally",
       }
+    }
+  }
+
+  // Add method to get current student status
+  async getStudentCurrentStatus(admissionId: string, date: string): Promise<{
+    isCheckedIn: boolean
+    lastRecord: LibraryRecord | null
+  }> {
+    const todaysRecords = await this.getRecordsByDate(date)
+    const studentRecords = todaysRecords
+      .filter(record => record.admissionId === admissionId)
+      .sort((a, b) => {
+        const timeA = new Date(a.checkInTime || a.date).getTime()
+        const timeB = new Date(b.checkInTime || b.date).getTime()
+        return timeB - timeA // Most recent first
+      })
+
+    const lastRecord = studentRecords[0] || null
+    const isCheckedIn = lastRecord?.status === "checked-in"
+
+    return {
+      isCheckedIn,
+      lastRecord
     }
   }
 }

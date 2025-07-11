@@ -532,6 +532,17 @@ ADMIN: {
 - ✅ Check all attributes are created correctly
 - ✅ Ensure DateTime attributes are properly configured
 
+**7. Duplicate Entries Being Created**
+- ✅ This has been fixed in the latest version
+- ✅ System now properly checks for existing records before creating new ones
+- ✅ Each student can only have one active check-in per day
+- ✅ Scanning the same ID multiple times will toggle between check-in/check-out
+
+**8. Multiple Records for Same Entry**
+- ✅ Enhanced duplicate detection prevents multiple check-ins
+- ✅ System sorts records by time to find the most recent status
+- ✅ Clear validation messages when student is already checked in
+
 ### Demo Mode
 If Appwrite is not configured:
 - System runs in demo mode
