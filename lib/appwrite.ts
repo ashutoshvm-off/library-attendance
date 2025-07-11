@@ -111,13 +111,16 @@ export class AppwriteService {
   async createLoginRecord(loginRecord: Omit<LoginRecord, "$id">): Promise<LoginRecord> {
     if (this.isConfigured && this.databases) {
       try {
+        // Remove any metadata fields before sending to Appwrite
+        const { $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanRecord } = loginRecord as any
+        
         const response = await this.databases.createDocument(
           this.databaseId,
           this.loginRecordsCollectionId,
           ID.unique(),
-          loginRecord,
+          cleanRecord,
         )
-        return response as LoginRecord
+        return response as unknown as LoginRecord
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -139,13 +142,16 @@ export class AppwriteService {
   async updateLoginRecord(recordId: string, updates: Partial<LoginRecord>): Promise<LoginRecord> {
     if (this.isConfigured && this.databases && !recordId.startsWith("local-")) {
       try {
+        // Remove metadata fields from updates
+        const { $id, $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanUpdates } = updates as any
+        
         const response = await this.databases.updateDocument(
           this.databaseId,
           this.loginRecordsCollectionId,
           recordId,
-          updates,
+          cleanUpdates,
         )
-        return response as LoginRecord
+        return response as unknown as LoginRecord
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -171,7 +177,7 @@ export class AppwriteService {
           Query.orderDesc("loginTime"),
           Query.limit(1000),
         ])
-        return response.documents as LoginRecord[]
+        return response.documents as unknown as LoginRecord[]
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -190,7 +196,7 @@ export class AppwriteService {
           Query.lessThanEqual("loginTime", endDate),
           Query.orderDesc("loginTime"),
         ])
-        return response.documents as LoginRecord[]
+        return response.documents as unknown as LoginRecord[]
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -227,7 +233,7 @@ export class AppwriteService {
   async loginStaff(email: string, password: string): Promise<any> {
     if (this.isConfigured && this.account) {
       try {
-        return await this.account.createEmailSession(email, password)
+        return await this.account.createSession(email, password)
       } catch (error) {
         console.error("Appwrite login error:", error)
         throw error
@@ -262,13 +268,16 @@ export class AppwriteService {
   async createStaff(staff: Omit<Staff, "$id">): Promise<Staff> {
     if (this.isConfigured && this.databases) {
       try {
+        // Remove any metadata fields before sending to Appwrite
+        const { $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanStaff } = staff as any
+        
         const response = await this.databases.createDocument(
           this.databaseId,
           this.staffCollectionId,
           ID.unique(),
-          staff,
+          cleanStaff,
         )
-        return response as Staff
+        return response as unknown as Staff
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -291,7 +300,7 @@ export class AppwriteService {
     if (this.isConfigured && this.databases) {
       try {
         const response = await this.databases.listDocuments(this.databaseId, this.staffCollectionId)
-        return response.documents as Staff[]
+        return response.documents as unknown as Staff[]
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -304,8 +313,11 @@ export class AppwriteService {
   async updateStaff(staffId: string, updates: Partial<Staff>): Promise<Staff> {
     if (this.isConfigured && this.databases && !staffId.startsWith("local-")) {
       try {
-        const response = await this.databases.updateDocument(this.databaseId, this.staffCollectionId, staffId, updates)
-        return response as Staff
+        // Remove metadata fields from updates
+        const { $id, $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanUpdates } = updates as any
+        
+        const response = await this.databases.updateDocument(this.databaseId, this.staffCollectionId, staffId, cleanUpdates)
+        return response as unknown as Staff
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -344,13 +356,16 @@ export class AppwriteService {
   async createRecord(record: Omit<LibraryRecord, "$id">): Promise<LibraryRecord> {
     if (this.isConfigured && this.databases) {
       try {
+        // Remove any metadata fields before sending to Appwrite
+        const { $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanRecord } = record as any
+        
         const response = await this.databases.createDocument(
           this.databaseId,
           this.recordsCollectionId,
           ID.unique(),
-          record,
+          cleanRecord,
         )
-        return response as LibraryRecord
+        return response as unknown as LibraryRecord
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -373,13 +388,16 @@ export class AppwriteService {
   async updateRecord(recordId: string, updates: Partial<LibraryRecord>): Promise<LibraryRecord> {
     if (this.isConfigured && this.databases && !recordId.startsWith("local-")) {
       try {
+        // Remove metadata fields from updates
+        const { $id, $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanUpdates } = updates as any
+        
         const response = await this.databases.updateDocument(
           this.databaseId,
           this.recordsCollectionId,
           recordId,
-          updates,
+          cleanUpdates,
         )
-        return response as LibraryRecord
+        return response as unknown as LibraryRecord
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -423,7 +441,7 @@ export class AppwriteService {
           Query.equal("date", date),
           Query.orderDesc("checkInTime"),
         ])
-        return response.documents as LibraryRecord[]
+        return response.documents as unknown as LibraryRecord[]
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -447,7 +465,7 @@ export class AppwriteService {
           Query.orderDesc("checkInTime"),
           Query.limit(1000), // Adjust limit as needed
         ])
-        return response.documents as LibraryRecord[]
+        return response.documents as unknown as LibraryRecord[]
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -470,7 +488,7 @@ export class AppwriteService {
         ])
 
         if (response.documents.length > 0) {
-          return response.documents[0] as Student
+          return response.documents[0] as unknown as Student
         }
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
@@ -496,13 +514,16 @@ export class AppwriteService {
   async createStudent(student: Omit<Student, "$id">): Promise<Student> {
     if (this.isConfigured && this.databases) {
       try {
+        // Remove any metadata fields before sending to Appwrite
+        const { $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanStudent } = student as any
+        
         const response = await this.databases.createDocument(
           this.databaseId,
           this.studentsCollectionId,
           ID.unique(),
-          student,
+          cleanStudent,
         )
-        return response as Student
+        return response as unknown as Student
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -528,7 +549,7 @@ export class AppwriteService {
         const response = await this.databases.listDocuments(this.databaseId, this.studentsCollectionId, [
           Query.orderAsc("name"),
         ])
-        return response.documents as Student[]
+        return response.documents as unknown as Student[]
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }
@@ -543,13 +564,16 @@ export class AppwriteService {
   async updateStudent(studentId: string, updates: Partial<Student>): Promise<Student> {
     if (this.isConfigured && this.databases && !studentId.startsWith("local-")) {
       try {
+        // Remove metadata fields from updates
+        const { $id, $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanUpdates } = updates as any
+        
         const response = await this.databases.updateDocument(
           this.databaseId,
           this.studentsCollectionId,
           studentId,
-          updates,
+          cleanUpdates,
         )
-        return response as Student
+        return response as unknown as Student
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
       }

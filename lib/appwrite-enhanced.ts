@@ -158,18 +158,21 @@ export class EnhancedAppwriteService {
     // Try to sync with Appwrite
     if (this.isConfigured && navigator.onLine) {
       try {
+        // Remove any metadata fields before sending to Appwrite
+        const { $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanRecord } = record as any
+        
         const response = await this.databases!.createDocument(
           this.databaseId,
           this.recordsCollectionId,
           ID.unique(),
-          record,
+          cleanRecord,
         )
 
         // Update local record with server ID
         const updatedRecords = records.map((r) => (r.$id === localId ? { ...r, $id: response.$id } : r))
         this.setLocalData("records", updatedRecords)
 
-        return response as LibraryRecord
+        return response as unknown as LibraryRecord
       } catch (error) {
         console.error("Failed to sync record to Appwrite, queuing for later:", error)
         this.offlineSyncService.queueRecordCreate(record, localId)
@@ -197,13 +200,16 @@ export class EnhancedAppwriteService {
     // Try to sync with Appwrite
     if (this.isConfigured && navigator.onLine && !recordId.startsWith("local-")) {
       try {
+        // Remove metadata fields from updates
+        const { $id, $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanUpdates } = updates as any
+        
         const response = await this.databases!.updateDocument(
           this.databaseId,
           this.recordsCollectionId,
           recordId,
-          updates,
+          cleanUpdates,
         )
-        return response as LibraryRecord
+        return response as unknown as LibraryRecord
       } catch (error) {
         console.error("Failed to sync record update to Appwrite, queuing for later:", error)
         this.offlineSyncService.queueRecordUpdate({ $id: recordId, ...updates })
@@ -252,18 +258,21 @@ export class EnhancedAppwriteService {
     // Try to sync with Appwrite
     if (this.isConfigured && navigator.onLine) {
       try {
+        // Remove any metadata fields before sending to Appwrite
+        const { $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanStudent } = student as any
+        
         const response = await this.databases!.createDocument(
           this.databaseId,
           this.studentsCollectionId,
           ID.unique(),
-          student,
+          cleanStudent,
         )
 
         // Update local student with server ID
         const updatedStudents = students.map((s) => (s.$id === localId ? { ...s, $id: response.$id } : s))
         this.setLocalData("students", updatedStudents)
 
-        return response as Student
+        return response as unknown as Student
       } catch (error) {
         console.error("Failed to sync student to Appwrite, queuing for later:", error)
         this.offlineSyncService.queueStudentCreate(student, localId)
@@ -291,13 +300,16 @@ export class EnhancedAppwriteService {
     // Try to sync with Appwrite
     if (this.isConfigured && navigator.onLine && !studentId.startsWith("local-")) {
       try {
+        // Remove metadata fields from updates
+        const { $id, $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanUpdates } = updates as any
+        
         const response = await this.databases!.updateDocument(
           this.databaseId,
           this.studentsCollectionId,
           studentId,
-          updates,
+          cleanUpdates,
         )
-        return response as Student
+        return response as unknown as Student
       } catch (error) {
         console.error("Failed to sync student update to Appwrite, queuing for later:", error)
         this.offlineSyncService.queueStudentUpdate({ $id: studentId, ...updates })
@@ -346,18 +358,21 @@ export class EnhancedAppwriteService {
     // Try to sync with Appwrite
     if (this.isConfigured && navigator.onLine) {
       try {
+        // Remove any metadata fields before sending to Appwrite
+        const { $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanRecord } = loginRecord as any
+        
         const response = await this.databases!.createDocument(
           this.databaseId,
           this.loginRecordsCollectionId,
           ID.unique(),
-          loginRecord,
+          cleanRecord,
         )
 
         // Update local record with server ID
         const updatedRecords = records.map((r) => (r.$id === localId ? { ...r, $id: response.$id } : r))
         this.setLocalData("login-records", updatedRecords)
 
-        return response as LoginRecord
+        return response as unknown as LoginRecord
       } catch (error) {
         console.error("Failed to sync login record to Appwrite, queuing for later:", error)
         this.offlineSyncService.queueLoginRecordCreate(loginRecord)
@@ -385,13 +400,16 @@ export class EnhancedAppwriteService {
     // Try to sync with Appwrite
     if (this.isConfigured && navigator.onLine && !recordId.startsWith("local-")) {
       try {
+        // Remove metadata fields from updates
+        const { $id, $databaseId, $collectionId, $permissions, $createdAt, $updatedAt, ...cleanUpdates } = updates as any
+        
         const response = await this.databases!.updateDocument(
           this.databaseId,
           this.loginRecordsCollectionId,
           recordId,
-          updates,
+          cleanUpdates,
         )
-        return response as LoginRecord
+        return response as unknown as LoginRecord
       } catch (error) {
         console.error("Failed to sync login record update to Appwrite, queuing for later:", error)
         this.offlineSyncService.queueLoginRecordUpdate({ $id: recordId, ...updates })
@@ -412,7 +430,7 @@ export class EnhancedAppwriteService {
           Query.equal("date", date),
           Query.orderDesc("checkInTime"),
         ])
-        return response.documents as LibraryRecord[]
+        return response.documents as unknown as LibraryRecord[]
       } catch (error) {
         console.error("Failed to fetch from Appwrite, using local data:", error)
       }
@@ -430,7 +448,7 @@ export class EnhancedAppwriteService {
           Query.orderDesc("checkInTime"),
           Query.limit(1000),
         ])
-        return response.documents as LibraryRecord[]
+        return response.documents as unknown as LibraryRecord[]
       } catch (error) {
         console.error("Failed to fetch from Appwrite, using local data:", error)
       }
@@ -446,7 +464,7 @@ export class EnhancedAppwriteService {
         const response = await this.databases!.listDocuments(this.databaseId, this.studentsCollectionId, [
           Query.orderAsc("name"),
         ])
-        return response.documents as Student[]
+        return response.documents as unknown as Student[]
       } catch (error) {
         console.error("Failed to fetch from Appwrite, using local data:", error)
       }
@@ -464,7 +482,7 @@ export class EnhancedAppwriteService {
         ])
 
         if (response.documents.length > 0) {
-          return response.documents[0] as Student
+          return response.documents[0] as unknown as Student
         }
       } catch (error) {
         console.error("Failed to fetch from Appwrite, using local data:", error)
@@ -493,7 +511,7 @@ export class EnhancedAppwriteService {
           Query.orderDesc("loginTime"),
           Query.limit(1000),
         ])
-        return response.documents as LoginRecord[]
+        return response.documents as unknown as LoginRecord[]
       } catch (error) {
         console.error("Failed to fetch from Appwrite, using local data:", error)
       }
