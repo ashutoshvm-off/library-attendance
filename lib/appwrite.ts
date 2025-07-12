@@ -67,23 +67,45 @@ export class AppwriteService {
       const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
 
       if (!endpoint || !projectId) {
-        console.warn("Appwrite environment variables not configured. Using fallback mode.")
+        console.warn("❌ Appwrite environment variables not configured. Using fallback mode.")
+        console.warn("Missing variables:", { 
+          endpoint: !!endpoint, 
+          projectId: !!projectId 
+        })
         return
       }
+
+      console.log("🔧 Initializing Appwrite with:", {
+        endpoint: endpoint,
+        projectId: projectId.substring(0, 8) + "..."
+      })
 
       this.client = new Client()
       this.client.setEndpoint(endpoint).setProject(projectId)
       this.databases = new Databases(this.client)
       this.account = new Account(this.client)
 
-      // Test the connection
+      console.log("Appwrite initialized successfully")
+
+      // Test the connection with better error handling
       await this.testConnection()
       
       this.isConfigured = true
-      console.log("Appwrite initialized and connected successfully")
+      console.log("✅ Appwrite initialized and connected successfully")
     } catch (error) {
-      console.error("Failed to initialize Appwrite:", error)
+      console.error("❌ Failed to initialize Appwrite:", error)
       this.isConfigured = false
+      
+      // Provide specific error guidance
+      if (error instanceof Error) {
+        if (error.message.includes("401")) {
+          console.error("🔑 Authentication error: Check your project ID and permissions")
+        } else if (error.message.includes("404")) {
+          console.error("📂 Project not found: Verify your project ID")
+        } else if (error.message.includes("network") || error.message.includes("fetch")) {
+          console.error("🌐 Network error: Check your internet connection")
+        }
+      }
     }
   }
 
@@ -93,17 +115,36 @@ export class AppwriteService {
     try {
       if (!this.databases) throw new Error("Databases not initialized")
       
+      console.log("🔍 Testing Appwrite connection...")
+      
       // Try to list documents from any collection to test connection
-      await this.databases.listDocuments(
+      // Use a more specific approach to avoid permission issues
+      const testResult = await this.databases.listDocuments(
         this.databaseId,
         this.recordsCollectionId,
         [Query.limit(1)]
       )
       
       this.connectionTested = true
-      console.log("Appwrite connection test successful")
+      console.log("✅ Appwrite connection test successful")
     } catch (error) {
-      console.error("Appwrite connection test failed:", error)
+      console.error("❌ Appwrite connection test failed:", error)
+      
+      // Provide specific error guidance
+      if (error instanceof Error) {
+        if (error.message.includes("401")) {
+          console.error("🔑 Permission denied. Please check:")
+          console.error("   1. Collection permissions are set to 'any' for all operations")
+          console.error("   2. Project ID is correct")
+          console.error("   3. Database and collection IDs match your Appwrite setup")
+        } else if (error.message.includes("404")) {
+          console.error("📂 Resource not found. Please check:")
+          console.error("   1. Database ID exists:", this.databaseId)
+          console.error("   2. Collection ID exists:", this.recordsCollectionId)
+          console.error("   3. All collections are created in Appwrite console")
+        }
+      }
+      
       throw error
     }
   }
@@ -673,31 +714,63 @@ export class AppwriteService {
 
   // Enhanced connection status
   getConnectionStatus(): { isConnected: boolean; message: string; details?: any } {
+    const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT
+    const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
+
+    if (!endpoint || !projectId) {
+      return {
+        isConnected: false,
+        message: "🔧 Configuration Required",
+        details: {
+          reason: "Environment variables missing",
+          missing: {
+            endpoint: !endpoint,
+            projectId: !projectId
+          },
+          fix: "Add NEXT_PUBLIC_APPWRITE_ENDPOINT and NEXT_PUBLIC_APPWRITE_PROJECT_ID to .env.local"
+        }
+      }
+    }
+
     if (this.isConfigured && this.connectionTested) {
       return {
         isConnected: true,
-        message: "Connected to Appwrite Cloud",
+        message: "🌐 Connected to Appwrite Cloud",
         details: {
-          endpoint: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
-          projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID?.substring(0, 8) + "...",
-          database: this.databaseId
+          endpoint: endpoint,
+          projectId: projectId.substring(0, 8) + "...",
+          database: this.databaseId,
+          collections: {
+            records: this.recordsCollectionId,
+            students: this.studentsCollectionId,
+            staff: this.staffCollectionId,
+            loginRecords: this.loginRecordsCollectionId
+          }
         }
       }
     } else if (this.isConfigured && !this.connectionTested) {
       return {
         isConnected: false,
-        message: "Appwrite configured but connection not tested",
+        message: "⚠️ Appwrite configured but connection failed",
         details: {
-          endpoint: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
-          projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID?.substring(0, 8) + "..."
+          endpoint: endpoint,
+          projectId: projectId.substring(0, 8) + "...",
+          possibleIssues: [
+            "Collection permissions not set to 'any'",
+            "Database or collection IDs don't match",
+            "Network connectivity issues",
+            "Invalid project ID"
+          ]
         }
       }
     } else {
       return {
         isConnected: false,
-        message: "Running in Demo Mode (Local Storage)",
+        message: "📱 Running in Demo Mode (Local Storage)",
         details: {
-          reason: "Environment variables not configured"
+          reason: "Appwrite initialization failed",
+          endpoint: endpoint || "Not set",
+          projectId: projectId ? projectId.substring(0, 8) + "..." : "Not set"
         }
       }
     }

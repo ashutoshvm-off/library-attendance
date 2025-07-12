@@ -500,81 +500,88 @@ ADMIN: {
 
 ### Common Issues
 
-**1. "Failed to fetch" Error**
+**1. "Status showing local only" / 401 Unauthorized Error**
+- ✅ **Check Collection Permissions**: In Appwrite console, for each collection:
+  1. Go to Settings → Permissions
+  2. Set all permissions to "any":
+     - Read: `any`
+     - Create: `any` 
+     - Update: `any`
+     - Delete: `any`
+- ✅ **Verify Environment Variables**: Check your `.env.local` file:
+  ```env
+  NEXT_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+  NEXT_PUBLIC_APPWRITE_PROJECT_ID=your-actual-project-id
+  NEXT_PUBLIC_APPWRITE_DATABASE_ID=library-db
+  NEXT_PUBLIC_APPWRITE_RECORDS_COLLECTION_ID=records
+  NEXT_PUBLIC_APPWRITE_STUDENTS_COLLECTION_ID=students
+  NEXT_PUBLIC_APPWRITE_STAFF_COLLECTION_ID=staff
+  NEXT_PUBLIC_APPWRITE_LOGIN_RECORDS_COLLECTION_ID=login-records
+  ```
+- ✅ **Restart Development Server**: After changing environment variables
+- ✅ **Check Project ID**: Ensure it matches exactly from Appwrite console
+- ✅ **Verify Collections Exist**: All 4 collections must be created in Appwrite
+
+**2. "Failed to fetch" Error**
 - ✅ Check internet connection
 - ✅ Verify Appwrite credentials in `.env.local`
 - ✅ Ensure all environment variables are set correctly
 - ✅ System falls back to localStorage automatically
 
-**2. Collections Not Found**
+**3. Collections Not Found**
 - ✅ Verify collection IDs match exactly in Appwrite console
 - ✅ Check that all 4 collections are created
 - ✅ Ensure collection IDs in `.env.local` match Appwrite
 
-**3. Permission Denied Errors**
-- ✅ Check collection permissions are set to "any" for all operations
+**4. Permission Denied Errors**
+- ✅ **MOST COMMON ISSUE**: Check collection permissions are set to "any" for all operations
 - ✅ Verify project ID is correct
 - ✅ Try recreating the collections with proper permissions
 
-**4. Admin Access Denied**
+**5. Admin Access Denied**
 - ✅ Logout current user
 - ✅ Login with `ADMIN` and password `admin2024`
 - ✅ Check browser console for errors
 
-**5. Records Not Showing**
+**6. Records Not Showing**
 - ✅ Verify all collections exist in Appwrite
 - ✅ Check collection IDs in environment variables
 - ✅ Try refreshing the page
 - ✅ Check browser network tab for API errors
 
-**6. Login History Not Working**
+**7. Login History Not Working**
 - ✅ Verify `login-records` collection exists
 - ✅ Check all attributes are created correctly
 - ✅ Ensure DateTime attributes are properly configured
 
-**7. Duplicate Entries Being Created**
+**8. Duplicate Entries Being Created**
 - ✅ This has been fixed in the latest version
 - ✅ System now properly checks for existing records before creating new ones
 - ✅ Each student can only have one active check-in per day
 - ✅ Scanning the same ID multiple times will toggle between check-in/check-out
 
-**8. Multiple Records for Same Entry**
+**9. Multiple Records for Same Entry**
 - ✅ Enhanced duplicate detection prevents multiple check-ins
 - ✅ System sorts records by time to find the most recent status
 - ✅ Clear validation messages when student is already checked in
 
-### Demo Mode
-If Appwrite is not configured:
-- System runs in demo mode
-- Data stored in browser localStorage
-- All features work normally including login tracking
-- Yellow banner indicates demo mode
+### Quick Fix for "Local Only" Status
 
-### Debugging Steps
-
-1. **Check Browser Console**
-   \`\`\`javascript
-   // Open browser dev tools and check for errors
-   console.log("Checking Appwrite connection...")
-   \`\`\`
-
-2. **Verify Environment Variables**
-   \`\`\`bash
-   # Check if .env.local exists and has correct values
-   cat .env.local
-   \`\`\`
-
-3. **Test Appwrite Connection**
-   - Go to Appwrite console
-   - Check if collections exist
-   - Verify permissions are set correctly
-   - Test creating a document manually
-
-4. **Check Network Requests**
-   - Open browser dev tools
-   - Go to Network tab
-   - Try performing an action
-   - Check if API requests are successful
+1. **Open Appwrite Console** → Your Project → Databases → library-db
+2. **For each collection** (records, students, staff, login-records):
+   - Click on the collection
+   - Go to "Settings" tab
+   - Scroll to "Permissions" section
+   - Set all permissions to `any`:
+     ```
+     Read: any
+     Create: any
+     Update: any
+     Delete: any
+     ```
+   - Click "Update"
+3. **Refresh your application**
+4. **Check browser console** for connection confirmation
 
 ## 📊 Database Schema Reference
 

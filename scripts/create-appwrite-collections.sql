@@ -1,6 +1,12 @@
 -- This is a reference for the Appwrite collections structure
 -- You'll need to create these collections in your Appwrite console
 
+-- IMPORTANT: Authentication Setup Required
+-- Before creating collections, ensure:
+-- 1. Your Appwrite project has proper API keys configured
+-- 2. Your project permissions allow anonymous access OR you have proper authentication
+-- 3. All environment variables are correctly set in .env.local
+
 -- Collection: records
 -- Attributes:
 -- - admissionId (string, required)
@@ -35,6 +41,16 @@
 -- - sessionDuration (integer, optional) -- in seconds
 -- - ipAddress (string, optional)
 -- - userAgent (string, optional)
+
+-- Permissions Setup (CRITICAL):
+-- For each collection, set permissions to:
+-- - Read: "any" (allows anonymous read access)
+-- - Create: "any" (allows anonymous create access)
+-- - Update: "any" (allows anonymous update access)
+-- - Delete: "any" (allows anonymous delete access)
+-- 
+-- Note: These are permissive settings for development.
+-- In production, implement proper role-based permissions.
 
 -- Indexes to create:
 -- records collection:

@@ -3,13 +3,28 @@
 import { AuthProvider, useAuth } from "@/components/auth-context"
 import LoginScreen from "@/components/login-screen"
 import { AdminPanel } from "@/components/admin-panel"
+import { ThemeProvider } from "@/components/theme-provider"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Shield, ArrowLeft, LogOut } from "lucide-react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 
 function AdminContent() {
   const { isAuthenticated, staff, logout } = useAuth()
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return <LoginScreen isAdminLogin={true} />
@@ -78,8 +93,15 @@ function AdminContent() {
 
 export default function AdminPage() {
   return (
-    <AuthProvider>
-      <AdminContent />
-    </AuthProvider>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <AuthProvider>
+        <AdminContent />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

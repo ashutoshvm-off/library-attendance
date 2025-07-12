@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -38,6 +39,8 @@ import {
   UserPlus,
   Save,
   X,
+  Moon,
+  Sun,
 } from "lucide-react"
 import { format, startOfMonth, endOfMonth } from "date-fns"
 import { AppwriteService } from "@/lib/appwrite"
@@ -94,6 +97,8 @@ function getStatusBadge(record: LibraryRecord) {
 }
 
 export function AdminPanel({ staff }: AdminPanelProps) {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [records, setRecords] = useState<LibraryRecord[]>([])
   const [filteredRecords, setFilteredRecords] = useState<LibraryRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -121,10 +126,17 @@ export function AdminPanel({ staff }: AdminPanelProps) {
   const [editingRecord, setEditingRecord] = useState<LibraryRecord | null>(null)
   const [isUpdatingRecord, setIsUpdatingRecord] = useState(false)
 
+  // Prevent hydration mismatch by only rendering after mounting
   useEffect(() => {
-    loadAllRecords()
-    loadStudents()
+    setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (mounted) {
+      loadAllRecords()
+      loadStudents()
+    }
+  }, [mounted])
 
   useEffect(() => {
     filterRecords()
@@ -499,32 +511,53 @@ export function AdminPanel({ staff }: AdminPanelProps) {
     uniqueStudents: new Set(filteredRecords.map((r) => r.admissionId)).size,
   }
 
+  // Don't render theme-dependent content until mounted
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-center min-h-[50vh]">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <header className="bg-white/80 backdrop-blur-sm border-b border-white/20 sticky top-0 z-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-blue-900 dark:to-indigo-900">
+      <header className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-white/20 dark:border-slate-700/20 sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-2 bg-white rounded-xl shadow-sm">
+              <div className="p-2 bg-white dark:bg-slate-700 rounded-xl shadow-sm">
                 <img src="/logo.png" alt="ASIET Logo" className="w-6 h-6 object-contain" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                   ASIET Admin
                 </h1>
-                <p className="text-sm text-gray-600">Library Management System</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Library Management System</p>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="hover:bg-white/20 dark:hover:bg-slate-700/20"
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </Button>
+              <Button variant="ghost" size="sm" className="hover:bg-white/20 dark:hover:bg-slate-700/20">
                 <Bell className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="hover:bg-white/20 dark:hover:bg-slate-700/20">
                 <Settings className="w-4 h-4" />
               </Button>
 
-              <div className="flex items-center gap-3 px-3 py-2 bg-white/60 rounded-full border border-white/20">
+              <div className="flex items-center gap-3 px-3 py-2 bg-white/60 dark:bg-slate-700/60 rounded-full border border-white/20 dark:border-slate-600/20">
                 <Avatar className="w-8 h-8">
                   <AvatarImage src={staff?.avatar || "/placeholder.svg"} />
                   <AvatarFallback className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm">
@@ -535,8 +568,8 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-sm">
-                  <p className="font-medium">{staff?.name}</p>
-                  <p className="text-gray-600 text-xs">{staff?.role}</p>
+                  <p className="font-medium dark:text-white">{staff?.name}</p>
+                  <p className="text-gray-600 dark:text-gray-400 text-xs">{staff?.role}</p>
                 </div>
               </div>
 
@@ -544,7 +577,7 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                 onClick={logout}
                 variant="outline"
                 size="sm"
-                className="border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
+                className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 bg-transparent"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
@@ -605,75 +638,77 @@ export function AdminPanel({ staff }: AdminPanelProps) {
           </Card>
         </div>
 
-        <Card className="bg-white/80 backdrop-blur-sm border-white/20">
+        <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-white/20 dark:border-slate-700/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 dark:text-white">
               <FileText className="w-5 h-5" />
               Library Records Management
             </CardTitle>
-            <CardDescription>View, filter, edit, and export library attendance records</CardDescription>
+            <CardDescription className="dark:text-slate-300">View, filter, edit, and export library attendance records</CardDescription>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
               <div className="space-y-2">
-                <Label>Start Date</Label>
+                <Label className="dark:text-white">Start Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal bg-white/70">
+                    <Button variant="outline" className="w-full justify-start text-left font-normal bg-white/70 dark:bg-slate-700/70 dark:text-white dark:border-slate-600">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {format(startDate, "PPP")}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0 dark:bg-slate-800 dark:border-slate-700" align="start">
                     <Calendar
                       mode="single"
                       selected={startDate}
                       onSelect={(date) => date && setStartDate(date)}
                       initialFocus
+                      className="dark:bg-slate-800"
                     />
                   </PopoverContent>
                 </Popover>
               </div>
 
               <div className="space-y-2">
-                <Label>End Date</Label>
+                <Label className="dark:text-white">End Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal bg-white/70">
+                    <Button variant="outline" className="w-full justify-start text-left font-normal bg-white/70 dark:bg-slate-700/70 dark:text-white dark:border-slate-600">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {format(endDate, "PPP")}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0 dark:bg-slate-800 dark:border-slate-700" align="start">
                     <Calendar
                       mode="single"
                       selected={endDate}
                       onSelect={(date) => date && setEndDate(date)}
                       initialFocus
+                      className="dark:bg-slate-800"
                     />
                   </PopoverContent>
                 </Popover>
               </div>
 
               <div className="space-y-2">
-                <Label>Search</Label>
+                <Label className="dark:text-white">Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                   <Input
                     placeholder="Search by ID or name..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-white/70"
+                    className="pl-10 bg-white/70 dark:bg-slate-700/70 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Status</Label>
+                <Label className="dark:text-white">Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="bg-white/70">
+                  <SelectTrigger className="bg-white/70 dark:bg-slate-700/70 dark:text-white dark:border-slate-600">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="dark:bg-slate-800 dark:border-slate-700">
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="checked-in">Checked In</SelectItem>
                     <SelectItem value="checked-out">Checked Out</SelectItem>
@@ -699,7 +734,7 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                 )}
                 Export Excel
               </Button>
-              <Button onClick={loadAllRecords} variant="outline" className="bg-white/70">
+              <Button onClick={loadAllRecords} variant="outline" className="bg-white/70 dark:bg-slate-700/70 dark:text-white dark:border-slate-600">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
               </Button>
@@ -710,28 +745,28 @@ export function AdminPanel({ staff }: AdminPanelProps) {
             {loading ? (
               <div className="text-center py-12">
                 <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-                <p className="text-gray-600">Loading records...</p>
+                <p className="text-gray-600 dark:text-gray-400">Loading records...</p>
               </div>
             ) : (
-              <div className="bg-white/70 rounded-lg border border-white/20">
+              <div className="bg-white/70 dark:bg-slate-700/70 rounded-lg border border-white/20 dark:border-slate-600/20">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-gray-200">
-                      <TableHead className="font-semibold">Admission ID</TableHead>
-                      <TableHead className="font-semibold">Student Name</TableHead>
-                      <TableHead className="font-semibold">Date</TableHead>
-                      <TableHead className="font-semibold">Check-in Time</TableHead>
-                      <TableHead className="font-semibold">Check-out Time</TableHead>
-                      <TableHead className="font-semibold">Duration</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
-                      <TableHead className="font-semibold">Actions</TableHead>
+                    <TableRow className="border-gray-200 dark:border-slate-600">
+                      <TableHead className="font-semibold dark:text-slate-200">Admission ID</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Student Name</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Date</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Check-in Time</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Check-out Time</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Duration</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Status</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRecords.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-12 text-gray-500">
-                          <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <TableCell colSpan={8} className="text-center py-12 text-gray-500 dark:text-gray-400">
+                          <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                           <p className="text-lg font-medium">No records found</p>
                           <p className="text-sm">Try adjusting your filters</p>
                         </TableCell>
@@ -740,14 +775,14 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                       filteredRecords.map((record) => (
                         <TableRow
                           key={record.$id || `${record.admissionId}-${record.checkInTime}`}
-                          className="border-gray-100"
+                          className="border-gray-100 dark:border-slate-600"
                         >
-                          <TableCell className="font-medium text-blue-600">{record.admissionId}</TableCell>
-                          <TableCell className="font-medium">{record.studentName}</TableCell>
-                          <TableCell>{format(new Date(record.date), "MMM dd, yyyy")}</TableCell>
+                          <TableCell className="font-medium text-blue-600 dark:text-blue-400">{record.admissionId}</TableCell>
+                          <TableCell className="font-medium dark:text-slate-200">{record.studentName}</TableCell>
+                          <TableCell className="dark:text-slate-300">{format(new Date(record.date), "MMM dd, yyyy")}</TableCell>
                           <TableCell>
                             {record.checkInTime ? (
-                              <span className="text-green-600 font-medium">
+                              <span className="text-green-600 dark:text-green-400 font-medium">
                                 {format(new Date(record.checkInTime), "HH:mm:ss")}
                               </span>
                             ) : (
@@ -756,7 +791,7 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                           </TableCell>
                           <TableCell>
                             {record.checkOutTime ? (
-                              <span className="text-red-600 font-medium">
+                              <span className="text-red-600 dark:text-red-400 font-medium">
                                 {format(new Date(record.checkOutTime), "HH:mm:ss")}
                               </span>
                             ) : (
@@ -765,7 +800,7 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                           </TableCell>
                           <TableCell>
                             {record.checkInTime && record.checkOutTime ? (
-                              <span className="text-blue-600 font-medium">
+                              <span className="text-blue-600 dark:text-blue-400 font-medium">
                                 {(
                                   (new Date(record.checkOutTime).getTime() - new Date(record.checkInTime).getTime()) /
                                   (1000 * 60 * 60)
@@ -781,41 +816,43 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                             <div className="flex items-center gap-2">
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button variant="outline" size="sm" onClick={() => setEditingRecord(record)}>
+                                  <Button variant="outline" size="sm" onClick={() => setEditingRecord(record)} className="dark:border-slate-600 dark:text-slate-200">
                                     <Edit className="w-3 h-3" />
                                   </Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-md">
+                                <DialogContent className="sm:max-w-md dark:bg-slate-800 dark:border-slate-700">
                                   <DialogHeader>
-                                    <DialogTitle>Edit Record</DialogTitle>
-                                    <DialogDescription>
+                                    <DialogTitle className="dark:text-white">Edit Record</DialogTitle>
+                                    <DialogDescription className="dark:text-slate-300">
                                       Update the admission ID and student name for this record.
                                     </DialogDescription>
                                   </DialogHeader>
                                   {editingRecord && (
                                     <div className="space-y-4 py-4">
                                       <div className="space-y-2">
-                                        <Label htmlFor="editRecordAdmissionId">Admission ID *</Label>
+                                        <Label htmlFor="editRecordAdmissionId" className="dark:text-white">Admission ID *</Label>
                                         <Input
                                           id="editRecordAdmissionId"
                                           value={editingRecord.admissionId}
                                           onChange={(e) =>
                                             setEditingRecord({ ...editingRecord, admissionId: e.target.value })
                                           }
+                                          className="dark:bg-slate-700 dark:text-white dark:border-slate-600"
                                         />
                                       </div>
                                       <div className="space-y-2">
-                                        <Label htmlFor="editRecordStudentName">Student Name *</Label>
+                                        <Label htmlFor="editRecordStudentName" className="dark:text-white">Student Name *</Label>
                                         <Input
                                           id="editRecordStudentName"
                                           value={editingRecord.studentName}
                                           onChange={(e) =>
                                             setEditingRecord({ ...editingRecord, studentName: e.target.value })
                                           }
+                                          className="dark:bg-slate-700 dark:text-white dark:border-slate-600"
                                         />
                                       </div>
-                                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                        <p className="text-sm text-blue-800">
+                                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                        <p className="text-sm text-blue-800 dark:text-blue-300">
                                           <strong>Note:</strong> This will update both the record and the student
                                           database if the student exists.
                                         </p>
@@ -823,7 +860,7 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                                     </div>
                                   )}
                                   <div className="flex justify-end gap-2">
-                                    <Button variant="outline" onClick={() => setEditingRecord(null)}>
+                                    <Button variant="outline" onClick={() => setEditingRecord(null)} className="dark:border-slate-600 dark:text-slate-200">
                                       <X className="w-4 h-4 mr-2" />
                                       Cancel
                                     </Button>
@@ -846,7 +883,7 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteRecord(record)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 dark:border-slate-600"
                               >
                                 <Trash2 className="w-3 h-3" />
                               </Button>
@@ -863,26 +900,26 @@ export function AdminPanel({ staff }: AdminPanelProps) {
         </Card>
 
         {/* Student Management Section */}
-        <Card className="bg-white/80 backdrop-blur-sm border-white/20">
+        <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-white/20 dark:border-slate-700/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 dark:text-white">
               <Users className="w-5 h-5" />
               Student Management
             </CardTitle>
-            <CardDescription>Add, edit, and manage student information</CardDescription>
+            <CardDescription className="dark:text-slate-300">Add, edit, and manage student information</CardDescription>
 
             <div className="flex items-center justify-between gap-4 pt-4">
               <div className="flex items-center gap-3 flex-1">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                   <Input
                     placeholder="Search students..."
                     value={studentSearchTerm}
                     onChange={(e) => setStudentSearchTerm(e.target.value)}
-                    className="pl-10 bg-white/70"
+                    className="pl-10 bg-white/70 dark:bg-slate-700/70 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
                   />
                 </div>
-                <Button onClick={loadStudents} variant="outline" className="bg-white/70">
+                <Button onClick={loadStudents} variant="outline" className="bg-white/70 dark:bg-slate-700/70 dark:text-white dark:border-slate-600">
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh
                 </Button>
@@ -895,47 +932,51 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                     Add Student
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-md dark:bg-slate-800 dark:border-slate-700">
                   <DialogHeader>
-                    <DialogTitle>Add New Student</DialogTitle>
-                    <DialogDescription>Enter the student's information to add them to the database.</DialogDescription>
+                    <DialogTitle className="dark:text-white">Add New Student</DialogTitle>
+                    <DialogDescription className="dark:text-slate-300">Enter the student's information to add them to the database.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="admissionId">Admission ID *</Label>
+                      <Label htmlFor="admissionId" className="dark:text-white">Admission ID *</Label>
                       <Input
                         id="admissionId"
                         placeholder="Enter admission ID"
                         value={newStudent.admissionId}
                         onChange={(e) => setNewStudent({ ...newStudent, admissionId: e.target.value })}
+                        className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="studentName">Full Name *</Label>
+                      <Label htmlFor="studentName" className="dark:text-white">Full Name *</Label>
                       <Input
                         id="studentName"
                         placeholder="Enter student's full name"
                         value={newStudent.name}
                         onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                        className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email (Optional)</Label>
+                      <Label htmlFor="email" className="dark:text-white">Email (Optional)</Label>
                       <Input
                         id="email"
                         type="email"
                         placeholder="Enter email address"
                         value={newStudent.email}
                         onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                        className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="phone">Phone (Optional)</Label>
+                      <Label htmlFor="phone" className="dark:text-white">Phone (Optional)</Label>
                       <Input
                         id="phone"
                         placeholder="Enter phone number"
                         value={newStudent.phone}
                         onChange={(e) => setNewStudent({ ...newStudent, phone: e.target.value })}
+                        className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
                       />
                     </div>
                   </div>
@@ -962,18 +1003,18 @@ export function AdminPanel({ staff }: AdminPanelProps) {
             {studentLoading ? (
               <div className="text-center py-12">
                 <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-                <p className="text-gray-600">Loading students...</p>
+                <p className="text-gray-600 dark:text-gray-400">Loading students...</p>
               </div>
             ) : (
-              <div className="bg-white/70 rounded-lg border border-white/20">
+              <div className="bg-white/70 dark:bg-slate-700/70 rounded-lg border border-white/20 dark:border-slate-600/20">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-gray-200">
-                      <TableHead className="font-semibold">Admission ID</TableHead>
-                      <TableHead className="font-semibold">Name</TableHead>
-                      <TableHead className="font-semibold">Email</TableHead>
-                      <TableHead className="font-semibold">Phone</TableHead>
-                      <TableHead className="font-semibold">Actions</TableHead>
+                    <TableRow className="border-gray-200 dark:border-slate-600">
+                      <TableHead className="font-semibold dark:text-slate-200">Admission ID</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Name</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Email</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Phone</TableHead>
+                      <TableHead className="font-semibold dark:text-slate-200">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -983,8 +1024,8 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                         student.name.toLowerCase().includes(studentSearchTerm.toLowerCase()),
                     ).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-12 text-gray-500">
-                          <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <TableCell colSpan={5} className="text-center py-12 text-gray-500 dark:text-gray-400">
+                          <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                           <p className="text-lg font-medium">No students found</p>
                           <p className="text-sm">Add students to get started</p>
                         </TableCell>
@@ -997,48 +1038,50 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                             student.name.toLowerCase().includes(studentSearchTerm.toLowerCase()),
                         )
                         .map((student) => (
-                          <TableRow key={student.$id} className="border-gray-100">
-                            <TableCell className="font-medium text-blue-600">{student.admissionId}</TableCell>
-                            <TableCell className="font-medium">{student.name}</TableCell>
-                            <TableCell className="text-gray-600">{student.email || "-"}</TableCell>
-                            <TableCell className="text-gray-600">{student.phone || "-"}</TableCell>
+                          <TableRow key={student.$id} className="border-gray-100 dark:border-slate-600">
+                            <TableCell className="font-medium text-blue-600 dark:text-blue-400">{student.admissionId}</TableCell>
+                            <TableCell className="font-medium dark:text-slate-200">{student.name}</TableCell>
+                            <TableCell className="text-gray-600 dark:text-gray-400">{student.email || "-"}</TableCell>
+                            <TableCell className="text-gray-600 dark:text-gray-400">{student.phone || "-"}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Dialog>
                                   <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm" onClick={() => setEditingStudent(student)}>
+                                    <Button variant="outline" size="sm" onClick={() => setEditingStudent(student)} className="dark:border-slate-600 dark:text-slate-200">
                                       <Edit className="w-3 h-3" />
                                     </Button>
                                   </DialogTrigger>
-                                  <DialogContent className="sm:max-w-md">
+                                  <DialogContent className="sm:max-w-md dark:bg-slate-800 dark:border-slate-700">
                                     <DialogHeader>
-                                      <DialogTitle>Edit Student</DialogTitle>
-                                      <DialogDescription>Update the student's information.</DialogDescription>
+                                      <DialogTitle className="dark:text-white">Edit Student</DialogTitle>
+                                      <DialogDescription className="dark:text-slate-300">Update the student's information.</DialogDescription>
                                     </DialogHeader>
                                     {editingStudent && (
                                       <div className="space-y-4 py-4">
                                         <div className="space-y-2">
-                                          <Label htmlFor="editAdmissionId">Admission ID *</Label>
+                                          <Label htmlFor="editAdmissionId" className="dark:text-white">Admission ID *</Label>
                                           <Input
                                             id="editAdmissionId"
                                             value={editingStudent.admissionId}
                                             onChange={(e) =>
                                               setEditingStudent({ ...editingStudent, admissionId: e.target.value })
                                             }
+                                            className="dark:bg-slate-700 dark:text-white dark:border-slate-600"
                                           />
                                         </div>
                                         <div className="space-y-2">
-                                          <Label htmlFor="editName">Full Name *</Label>
+                                          <Label htmlFor="editName" className="dark:text-white">Full Name *</Label>
                                           <Input
                                             id="editName"
                                             value={editingStudent.name}
                                             onChange={(e) =>
                                               setEditingStudent({ ...editingStudent, name: e.target.value })
                                             }
+                                            className="dark:bg-slate-700 dark:text-white dark:border-slate-600"
                                           />
                                         </div>
                                         <div className="space-y-2">
-                                          <Label htmlFor="editEmail">Email</Label>
+                                          <Label htmlFor="editEmail" className="dark:text-white">Email</Label>
                                           <Input
                                             id="editEmail"
                                             type="email"
@@ -1046,22 +1089,24 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                                             onChange={(e) =>
                                               setEditingStudent({ ...editingStudent, email: e.target.value })
                                             }
+                                            className="dark:bg-slate-700 dark:text-white dark:border-slate-600"
                                           />
                                         </div>
                                         <div className="space-y-2">
-                                          <Label htmlFor="editPhone">Phone</Label>
+                                          <Label htmlFor="editPhone" className="dark:text-white">Phone</Label>
                                           <Input
                                             id="editPhone"
                                             value={editingStudent.phone || ""}
                                             onChange={(e) =>
                                               setEditingStudent({ ...editingStudent, phone: e.target.value })
                                             }
+                                            className="dark:bg-slate-700 dark:text-white dark:border-slate-600"
                                           />
                                         </div>
                                       </div>
                                     )}
                                     <div className="flex justify-end gap-2">
-                                      <Button variant="outline" onClick={() => setEditingStudent(null)}>
+                                      <Button variant="outline" onClick={() => setEditingStudent(null)} className="dark:border-slate-600 dark:text-slate-200">
                                         Cancel
                                       </Button>
                                       <Button onClick={handleUpdateStudent} className="bg-blue-600 hover:bg-blue-700">
@@ -1075,7 +1120,7 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleDeleteStudent(student)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 dark:border-slate-600"
                                 >
                                   <Trash2 className="w-3 h-3" />
                                 </Button>

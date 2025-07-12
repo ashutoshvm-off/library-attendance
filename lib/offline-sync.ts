@@ -75,13 +75,20 @@ export class OfflineSyncService {
 
   private async checkConnectivity() {
     try {
-      const response = await fetch("https://cloud.appwrite.io/v1/health", {
-        method: "GET",
-        mode: "no-cors",
-        cache: "no-cache",
-      })
-      this.isOnline = true
+      // Check if Appwrite is configured first
+      if (!this.appwriteService.isAppwriteConfigured()) {
+        this.isOnline = false
+        this.notifyListeners()
+        return
+      }
+
+      // Test Appwrite connectivity instead of generic health check
+      await this.appwriteService.retryConnection()
+      this.isOnline = this.appwriteService.isAppwriteConfigured()
+      
+      console.log("🔍 Connectivity check result:", this.isOnline ? "Connected" : "Disconnected")
     } catch (error) {
+      console.error("❌ Connectivity check failed:", error)
       this.isOnline = false
     }
     this.notifyListeners()
@@ -348,15 +355,16 @@ export class OfflineSyncService {
   // Status methods
   public getSyncStatus(): SyncStatus {
     const appwriteConfigured = this.appwriteService.isAppwriteConfigured()
-    const isOnline = navigator.onLine
+    const connectionStatus = this.appwriteService.getConnectionStatus()
+    const isOnline = navigator.onLine && connectionStatus.isConnected
 
     return {
-      isOnline: this.isOnline,
+      isOnline: isOnline,
       isSyncing: this.isSyncing,
       lastSyncTime: localStorage.getItem("library-last-sync"),
       pendingItems: this.syncQueue.length,
       failedItems: this.syncQueue.filter((item) => item.retryCount >= this.maxRetries).length,
-      // Only consider truly synced if Appwrite is configured, online, no pending items, and no failed items
+      // Only consider truly synced if Appwrite is configured, connected, no pending items, and no failed items
       isTrulySynced: appwriteConfigured && isOnline && this.syncQueue.length === 0 && !this.isSyncing,
     }
   }
