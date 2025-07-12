@@ -156,14 +156,14 @@ function LoginScreen({ isAdminLogin = false }: LoginScreenProps) {
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur-lg opacity-75"></div>
                   <div className="relative p-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl">
-                    <img src="/logo.png" alt="College Logo" className="w-10 h-10 object-contain" />
+                    <img src="/logo.png" alt="ASIET Logo" className="w-10 h-10 object-contain" />
                   </div>
                 </div>
                 <div>
                   <h1 className="text-5xl lg:text-6xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent">
                     LibraryOS
                   </h1>
-                  <p className="text-lg text-gray-300 font-medium">Your College Library</p>
+                  <p className="text-lg text-gray-300 font-medium">ASIET Library</p>
                 </div>
               </div>
 
@@ -247,7 +247,7 @@ function LoginScreen({ isAdminLogin = false }: LoginScreenProps) {
                 <div className="relative mx-auto">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full blur-lg opacity-75"></div>
                   <div className="relative p-4 bg-white rounded-full shadow-lg">
-                    <img src="/logo.png" alt="College Logo" className="w-10 h-10 object-contain" />
+                    <img src="/logo.png" alt="ASIET Logo" className="w-10 h-10 object-contain" />
                   </div>
                 </div>
                 <div>

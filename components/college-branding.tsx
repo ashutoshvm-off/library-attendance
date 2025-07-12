@@ -35,7 +35,7 @@ export function CollegeBranding({
     login: "from-blue-600 to-purple-600",
   }
 
-  const collegeName = "Your College Name" // Replace with your college name
+  const collegeName = "ASIET" // Updated college name
   const tagline = "Library Management System"
 
   return (
@@ -53,11 +53,7 @@ export function CollegeBranding({
           <div
             className={`${sizeClasses[size]} bg-gradient-to-r ${gradients[variant]} rounded-lg flex items-center justify-center text-white font-bold text-sm`}
           >
-            {collegeName
-              .split(" ")
-              .map((word) => word[0])
-              .join("")
-              .slice(0, 2)}
+            ASIET
           </div>
         )}
       </div>

@@ -12,7 +12,7 @@ import { Upload, ImageIcon, X, Check } from "lucide-react"
 
 export function LogoUpload() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
-  const [collegeName, setCollegeName] = useState("")
+  const [collegeName, setCollegeName] = useState("ASIET")
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -71,7 +71,7 @@ export function LogoUpload() {
 
       toast({
         title: "Logo Updated Successfully!",
-        description: "Your college logo and name have been saved. Refresh the page to see changes.",
+        description: "ASIET logo and name have been saved. Refresh the page to see changes.",
       })
 
       // Refresh the page to show new logo

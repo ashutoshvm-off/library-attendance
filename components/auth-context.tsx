@@ -64,7 +64,7 @@ const STAFF_DATABASE: Record<string, Staff> = {
   },
   ADMIN: {
     id: "ADMIN",
-    name: "Administrator",
+    name: "ASIET Administrator",
     role: "System Admin",
     avatar: "/placeholder.svg?height=40&width=40",
     isAdmin: true,
@@ -73,7 +73,7 @@ const STAFF_DATABASE: Record<string, Staff> = {
   // Add more admin accounts if needed
   ADMIN001: {
     id: "ADMIN001",
-    name: "John Admin",
+    name: "ASIET Admin",
     role: "System Admin",
     avatar: "/placeholder.svg?height=40&width=40",
     isAdmin: true,

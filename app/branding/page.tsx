@@ -46,7 +46,7 @@ function BrandingContent() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              College Branding
+              ASIET Branding
             </h1>
             <p className="text-gray-600">Customize your library system's appearance</p>
           </div>
@@ -91,7 +91,7 @@ function BrandingContent() {
                     </div>
                     <div>
                       <h4 className="font-bold text-lg bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Your College Name
+                        ASIET
                       </h4>
                       <p className="text-xs text-gray-600">Library Management System</p>
                     </div>
@@ -121,7 +121,7 @@ function BrandingContent() {
                     </div>
                     <div>
                       <h4 className="font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Your College Library
+                        ASIET Library
                       </h4>
                       <p className="text-xs text-gray-600">Library Management System</p>
                     </div>

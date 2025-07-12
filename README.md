@@ -99,7 +99,7 @@ A comprehensive, modern library management system with barcode scanning, real-ti
 3. **Verify your email** address
 4. **Create a new project**
    - Click "Create Project"
-   - Enter project name: `Library Management System`
+   - Enter project name: `ASIET Library Management System`
    - Choose your preferred region
    - Click "Create"
 
@@ -745,7 +745,7 @@ console.log("Environment variables check:", {
 
 ---
 
-**LibraryOS** - Making library management modern, efficient, and beautiful! 📚✨
+**LibraryOS** - Making library management modern, efficient, and beautiful for ASIET! 📚✨
 
 Built with ❤️ using Next.js, TypeScript, and Appwrite.
 
