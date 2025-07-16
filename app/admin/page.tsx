@@ -12,16 +12,17 @@ import { useEffect, useState } from "react"
 
 function AdminContent() {
   const { isAuthenticated, staff, logout } = useAuth()
-  const [isClient, setIsClient] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setIsClient(true)
+    setMounted(true)
   }, [])
 
-  if (!isClient) {
+  // Show loading state until component is mounted to prevent hydration mismatch
+  if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
       </div>
     )
   }
@@ -95,8 +96,8 @@ export default function AdminPage() {
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="system"
-      enableSystem
+      defaultTheme="light"
+      enableSystem={false}
       disableTransitionOnChange
     >
       <AuthProvider>

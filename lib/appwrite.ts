@@ -601,8 +601,34 @@ export class AppwriteService {
     return student
   }
 
+  // Check if admission ID already exists
+  async checkAdmissionIdExists(admissionId: string): Promise<boolean> {
+    if (this.isConfigured && this.databases) {
+      try {
+        const response = await this.databases.listDocuments(this.databaseId, this.studentsCollectionId, [
+          Query.equal("admissionId", admissionId.trim()),
+          Query.limit(1)
+        ])
+        return response.documents.length > 0
+      } catch (error) {
+        console.error("Error checking admission ID existence:", error)
+        // Fall back to localStorage check
+      }
+    }
+
+    // Fallback to localStorage
+    const students = this.getLocalData<Student>("students")
+    return students.some(s => s.admissionId.toLowerCase() === admissionId.toLowerCase().trim())
+  }
+
   // Create a new student
   async createStudent(student: Omit<Student, "$id">): Promise<Student> {
+    // Check for duplicate admission ID first
+    const admissionIdExists = await this.checkAdmissionIdExists(student.admissionId)
+    if (admissionIdExists) {
+      throw new Error(`Student with admission ID "${student.admissionId}" already exists`)
+    }
+
     if (this.isConfigured && this.databases) {
       try {
         // Remove any metadata fields before sending to Appwrite
@@ -617,18 +643,27 @@ export class AppwriteService {
         return response as unknown as Student
       } catch (error) {
         console.error("Appwrite error, falling back to localStorage:", error)
+        // If Appwrite fails, still check localStorage for duplicates
+        const localStudents = this.getLocalData<Student>("students")
+        if (localStudents.some(s => s.admissionId.toLowerCase() === student.admissionId.toLowerCase())) {
+          throw new Error(`Student with admission ID "${student.admissionId}" already exists`)
+        }
       }
     }
 
-    // Fallback to localStorage
+    // Fallback to localStorage - double check for duplicates
+    const localStudents = this.getLocalData<Student>("students")
+    if (localStudents.some(s => s.admissionId.toLowerCase() === student.admissionId.toLowerCase())) {
+      throw new Error(`Student with admission ID "${student.admissionId}" already exists`)
+    }
+
     const newStudent: Student = {
       $id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...student,
     }
 
-    const students = this.getLocalData<Student>("students")
-    students.push(newStudent)
-    this.setLocalData("students", students)
+    localStudents.push(newStudent)
+    this.setLocalData("students", localStudents)
 
     return newStudent
   }
@@ -787,6 +822,29 @@ export class AppwriteService {
     } catch (error) {
       console.error("Connection retry failed:", error)
       return false
+    }
+  }
+
+  // Add method to get current student status
+  async getStudentCurrentStatus(admissionId: string, date: string): Promise<{
+    isCheckedIn: boolean
+    lastRecord: LibraryRecord | null
+  }> {
+    const todaysRecords = await this.getRecordsByDate(date)
+    const studentRecords = todaysRecords
+      .filter(record => record.admissionId === admissionId)
+      .sort((a, b) => {
+        const timeA = new Date(a.checkInTime || a.date).getTime()
+        const timeB = new Date(b.checkInTime || b.date).getTime()
+        return timeB - timeA // Most recent first
+      })
+
+    const lastRecord = studentRecords[0] || null
+    const isCheckedIn = lastRecord?.status === "checked-in"
+
+    return {
+      isCheckedIn,
+      lastRecord
     }
   }
 }

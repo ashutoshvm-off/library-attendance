@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "./ui/dialog"
 import { toast } from "@/hooks/use-toast"
 import {
   CalendarIcon,
@@ -41,6 +41,10 @@ import {
   X,
   Moon,
   Sun,
+  Upload,
+  Download,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react"
 import { format, startOfMonth, endOfMonth } from "date-fns"
 import { AppwriteService } from "@/lib/appwrite"
@@ -88,6 +92,22 @@ interface Student {
   phone?: string
 }
 
+interface ImportProgress {
+  total: number
+  processed: number
+  successful: number
+  failed: number
+  errors: string[]
+}
+
+interface ImportStudentData {
+  admissionId: string
+  name: string
+  email?: string
+  phone?: string
+  error?: string
+}
+
 function getStatusBadge(record: LibraryRecord) {
   if (record.status === "checked-in") {
     return <Badge className="bg-green-600 text-white">Checked In</Badge>
@@ -125,6 +145,316 @@ export function AdminPanel({ staff }: AdminPanelProps) {
   // New states for editing records
   const [editingRecord, setEditingRecord] = useState<LibraryRecord | null>(null)
   const [isUpdatingRecord, setIsUpdatingRecord] = useState(false)
+
+  // New states for import functionality
+  const [isImporting, setIsImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
+  const [importData, setImportData] = useState<ImportStudentData[]>([])
+  const [showImportPreview, setShowImportPreview] = useState(false)
+  
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        "Admission ID": "ASIET001",
+        "Full Name": "John Doe",
+        "Email": "john.doe@example.com",
+        "Phone": "9876543210"
+      },
+      {
+        "Admission ID": "ASIET002", 
+        "Full Name": "Jane Smith",
+        "Email": "jane.smith@example.com",
+        "Phone": "9876543211"
+      }
+    ]
+
+    try {
+      import("xlsx").then((XLSX) => {
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.json_to_sheet(templateData)
+        
+        // Set column widths
+        ws['!cols'] = [
+          { wch: 15 }, // Admission ID
+          { wch: 25 }, // Full Name
+          { wch: 30 }, // Email
+          { wch: 15 }  // Phone
+        ]
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Students Template")
+        
+        const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+        const blob = new Blob([wbout], { type: "application/octet-stream" })
+        
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = "students-import-template.xlsx"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+
+        toast({
+          title: "Template Downloaded",
+          description: "Use this template to format your student data for import",
+        })
+      })
+    } catch (error) {
+      console.error("Error downloading template:", error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to download template file",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    if (!['xlsx', 'xls', 'csv'].includes(fileExtension || '')) {
+      toast({
+        title: "Invalid File Format",
+        description: "Please upload an Excel (.xlsx, .xls) or CSV file",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const XLSX = await import("xlsx")
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data, { type: "array" })
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][]
+
+      if (jsonData.length < 2) {
+        toast({
+          title: "Empty File",
+          description: "The file appears to be empty or has no data rows",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Parse the data
+      const headers = jsonData[0].map(h => h?.toString().toLowerCase().trim())
+      const rows = jsonData.slice(1)
+
+      // Find column indices with more flexible matching
+      const admissionIdIndex = headers.findIndex(h => 
+        h.includes('admission') || h.includes('id') || h === 'admission id' || h === 'admissionid'
+      )
+      const nameIndex = headers.findIndex(h => 
+        h.includes('name') || h === 'full name' || h === 'student name'
+      )
+      const emailIndex = headers.findIndex(h => h.includes('email'))
+      const phoneIndex = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact'))
+
+      if (admissionIdIndex === -1 || nameIndex === -1) {
+        toast({
+          title: "Invalid Format",
+          description: "File must contain 'Admission ID' and 'Name' columns. Found headers: " + headers.join(', '),
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Get existing students to check for duplicates during parsing
+      const existingStudents = await appwriteService.getAllStudents()
+      const existingIds = new Set(existingStudents.map(s => s.admissionId.toLowerCase()))
+
+      const parsedData: ImportStudentData[] = rows
+        .filter(row => row && row.length > 0 && row[admissionIdIndex]?.toString().trim() && row[nameIndex]?.toString().trim())
+        .map((row, index) => {
+          const admissionId = row[admissionIdIndex]?.toString().trim() || ''
+          const name = row[nameIndex]?.toString().trim() || ''
+          const email = emailIndex !== -1 && row[emailIndex] ? row[emailIndex]?.toString().trim() : undefined
+          const phone = phoneIndex !== -1 && row[phoneIndex] ? row[phoneIndex]?.toString().trim() : undefined
+
+          // Enhanced validation
+          let error = ""
+          if (!admissionId) {
+            error = "Missing admission ID"
+          } else if (!name) {
+            error = "Missing name"
+          } else if (existingIds.has(admissionId.toLowerCase())) {
+            error = "Student already exists in database"
+          } else if (email && email.length > 0 && !email.includes("@")) {
+            error = "Invalid email format"
+          } else if (phone && phone.length > 0 && !/^\d{10}$/.test(phone.replace(/\D/g, ''))) {
+            // Basic phone validation - should be 10 digits
+            error = "Invalid phone format (should be 10 digits)"
+          }
+
+          return {
+            admissionId,
+            name,
+            email: email && email.length > 0 ? email : undefined,
+            phone: phone && phone.length > 0 ? phone : undefined,
+            error: error || undefined
+          }
+        })
+
+      if (parsedData.length === 0) {
+        toast({
+          title: "No Valid Data",
+          description: "No valid student records found in the file",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setImportData(parsedData)
+      setShowImportPreview(true)
+
+      const validCount = parsedData.filter(item => !item.error).length
+      const duplicateCount = parsedData.filter(item => item.error?.includes('already exists')).length
+
+      toast({
+        title: "File Parsed Successfully",
+        description: `Found ${parsedData.length} records. ${validCount} are valid, ${duplicateCount} are duplicates.`,
+      })
+
+    } catch (error) {
+      console.error("Error parsing file:", error)
+      toast({
+        title: "File Parse Error",
+        description: "Failed to read the file. Please check the format and try again.",
+        variant: "destructive",
+      })
+    }
+
+    // Reset file input
+    e.target.value = ""
+  }
+  
+  const executeImport = async () => {
+    const validRecords = importData.filter(item => !item.error)
+    if (validRecords.length === 0) {
+      toast({
+        title: "No Valid Records",
+        description: "Please fix the errors before importing",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsImporting(true)
+    const progress: ImportProgress = {
+      total: validRecords.length,
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      errors: []
+    }
+    
+    setImportProgress(progress)
+
+    try {
+      // Get fresh list of existing students to avoid duplicates
+      const existingStudents = await appwriteService.getAllStudents()
+      const existingIds = new Set(existingStudents.map(s => s.admissionId.toLowerCase()))
+
+      for (let i = 0; i < validRecords.length; i++) {
+        const record = validRecords[i]
+        
+        try {
+          // Double-check if student already exists (real-time check)
+          if (existingIds.has(record.admissionId.toLowerCase())) {
+            progress.failed++
+            progress.errors.push(`${record.admissionId}: Student already exists`)
+          } else {
+            // Validate data before creating
+            if (!record.admissionId?.trim() || !record.name?.trim()) {
+              progress.failed++
+              progress.errors.push(`${record.admissionId || 'Unknown'}: Missing required fields`)
+              continue
+            }
+
+            // Create student in database
+            const studentData = {
+              admissionId: record.admissionId.trim(),
+              name: record.name.trim(),
+              email: record.email?.trim() || undefined,
+              phone: record.phone?.trim() || undefined
+            }
+
+            const createdStudent = await appwriteService.createStudent(studentData)
+            
+            // Verify the student was created successfully
+            if (createdStudent && createdStudent.$id) {
+              progress.successful++
+              existingIds.add(record.admissionId.toLowerCase()) // Add to set to prevent duplicates in same batch
+              console.log(`Successfully imported student: ${record.admissionId} - ${record.name}`)
+            } else {
+              throw new Error('Student creation returned invalid response')
+            }
+          }
+        } catch (error) {
+          progress.failed++
+          let errorMessage = 'Unknown error'
+          if (error instanceof Error) {
+            errorMessage = error.message
+            // Handle specific duplicate error
+            if (errorMessage.includes("already exists")) {
+              errorMessage = "Student already exists in database"
+            }
+          }
+          progress.errors.push(`${record.admissionId}: ${errorMessage}`)
+          console.error(`Failed to import student ${record.admissionId}:`, error)
+        }
+
+        progress.processed++
+        setImportProgress({ ...progress })
+
+        // Small delay to prevent overwhelming the database and show progress
+        if (i % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      }
+
+      // Show final results
+      if (progress.successful > 0) {
+        toast({
+          title: "Import Completed",
+          description: `Successfully imported ${progress.successful} students. ${progress.failed} failed.`,
+          variant: progress.failed === 0 ? "default" : "destructive",
+        })
+        
+        // Refresh the student list to show new students
+        await loadStudents()
+      } else {
+        toast({
+          title: "Import Failed",
+          description: "No students were imported. Check the errors below.",
+          variant: "destructive",
+        })
+      }
+
+    } catch (error) {
+      console.error("Import error:", error)
+      toast({
+        title: "Import Error",
+        description: `An unexpected error occurred during import: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsImporting(false)
+      
+      // Keep progress visible for a few seconds then auto-close
+      setTimeout(() => {
+        setImportProgress(null)
+        if (progress.successful > 0) {
+          setShowImportPreview(false)
+          setImportData([])
+        }
+      }, 5000)
+    }
+  }
 
   // Prevent hydration mismatch by only rendering after mounting
   useEffect(() => {
@@ -323,17 +653,6 @@ export function AdminPanel({ staff }: AdminPanelProps) {
       return
     }
 
-    // Check if admission ID already exists
-    const existingStudent = students.find((s) => s.admissionId === newStudent.admissionId.trim())
-    if (existingStudent) {
-      toast({
-        title: "Duplicate Entry",
-        description: "A student with this admission ID already exists",
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsAddingStudent(true)
     try {
       const studentData = {
@@ -355,11 +674,19 @@ export function AdminPanel({ staff }: AdminPanelProps) {
       loadStudents()
     } catch (error) {
       console.error("Error adding student:", error)
-      toast({
-        title: "Error",
-        description: "Failed to add student",
-        variant: "destructive",
-      })
+      if (error instanceof Error && error.message.includes("already exists")) {
+        toast({
+          title: "Duplicate Entry",
+          description: error.message,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add student",
+          variant: "destructive",
+        })
+      }
     } finally {
       setIsAddingStudent(false)
     }
@@ -514,12 +841,8 @@ export function AdminPanel({ staff }: AdminPanelProps) {
   // Don't render theme-dependent content until mounted
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="container mx-auto p-6">
-          <div className="flex items-center justify-center min-h-[50vh]">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
       </div>
     )
   }
@@ -925,77 +1248,242 @@ export function AdminPanel({ staff }: AdminPanelProps) {
                 </Button>
               </div>
 
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="bg-green-600 hover:bg-green-700">
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Add Student
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md dark:bg-slate-800 dark:border-slate-700">
-                  <DialogHeader>
-                    <DialogTitle className="dark:text-white">Add New Student</DialogTitle>
-                    <DialogDescription className="dark:text-slate-300">Enter the student's information to add them to the database.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="admissionId" className="dark:text-white">Admission ID *</Label>
-                      <Input
-                        id="admissionId"
-                        placeholder="Enter admission ID"
-                        value={newStudent.admissionId}
-                        onChange={(e) => setNewStudent({ ...newStudent, admissionId: e.target.value })}
-                        className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="studentName" className="dark:text-white">Full Name *</Label>
-                      <Input
-                        id="studentName"
-                        placeholder="Enter student's full name"
-                        value={newStudent.name}
-                        onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                        className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="dark:text-white">Email (Optional)</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="Enter email address"
-                        value={newStudent.email}
-                        onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
-                        className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="dark:text-white">Phone (Optional)</Label>
-                      <Input
-                        id="phone"
-                        placeholder="Enter phone number"
-                        value={newStudent.phone}
-                        onChange={(e) => setNewStudent({ ...newStudent, phone: e.target.value })}
-                        className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      onClick={handleAddStudent}
-                      disabled={isAddingStudent || !newStudent.admissionId.trim() || !newStudent.name.trim()}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {isAddingStudent ? (
-                        <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-                      ) : (
-                        <Plus className="w-4 h-4 mr-2" />
-                      )}
-                      {isAddingStudent ? "Adding..." : "Add Student"}
+              <div className="flex items-center gap-2">
+                <Button onClick={downloadTemplate} variant="outline" className="bg-white/70 dark:bg-slate-700/70 dark:text-white dark:border-slate-600">
+                  <Download className="w-4 h-4 mr-2" />
+                  Template
+                </Button>
+
+                <Dialog open={showImportPreview} onOpenChange={setShowImportPreview}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Import Students
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto dark:bg-slate-800 dark:border-slate-700">
+                    <DialogHeader>
+                      <DialogTitle className="dark:text-white">Import Students</DialogTitle>
+                      <DialogDescription className="dark:text-slate-300">
+                        {importData.length === 0 
+                          ? "Upload an Excel or CSV file to import multiple students at once."
+                          : `Review ${importData.length} records before importing`}
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    {importData.length === 0 ? (
+                      <div className="space-y-4 py-4">
+                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
+                          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                          <div className="space-y-2">
+                            <p className="text-lg font-medium dark:text-white">Upload Student Data</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Select an Excel (.xlsx, .xls) or CSV file containing student information
+                            </p>
+                          </div>
+                          <Input
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={handleFileImport}
+                            className="mt-4 max-w-sm mx-auto dark:bg-slate-700 dark:border-slate-600"
+                          />
+                        </div>
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                          <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">Required Columns:</h4>
+                          <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                            <li>• <strong>Admission ID</strong> - Unique identifier for each student</li>
+                            <li>• <strong>Full Name</strong> - Student's complete name</li>
+                            <li>• <strong>Email</strong> - Email address (optional)</li>
+                            <li>• <strong>Phone</strong> - Contact number (optional)</li>
+                          </ul>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 py-4">
+                        {importProgress && (
+                          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-blue-800 dark:text-blue-300">Import Progress</span>
+                              <span className="text-sm text-blue-600 dark:text-blue-400">
+                                {importProgress.processed} / {importProgress.total}
+                              </span>
+                            </div>
+                            <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 mb-2">
+                              <div 
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                style={{ width: `${(importProgress.processed / importProgress.total) * 100}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-green-600 dark:text-green-400">
+                                <CheckCircle className="w-4 h-4 inline mr-1" />
+                                {importProgress.successful} successful
+                              </span>
+                              {importProgress.failed > 0 && (
+                                <span className="text-red-600 dark:text-red-400">
+                                  <AlertCircle className="w-4 h-4 inline mr-1" />
+                                  {importProgress.failed} failed
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-gray-200 dark:border-slate-600">
+                                <TableHead className="font-semibold dark:text-slate-200">Status</TableHead>
+                                <TableHead className="font-semibold dark:text-slate-200">Admission ID</TableHead>
+                                <TableHead className="font-semibold dark:text-slate-200">Name</TableHead>
+                                <TableHead className="font-semibold dark:text-slate-200">Email</TableHead>
+                                <TableHead className="font-semibold dark:text-slate-200">Phone</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importData.map((item, index) => (
+                                <TableRow key={index} className="border-gray-100 dark:border-slate-600">
+                                  <TableCell>
+                                    {item.error ? (
+                                      <Badge variant="destructive" className="text-xs">
+                                        <AlertCircle className="w-3 h-3 mr-1" />
+                                        Error
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="bg-green-600 text-white text-xs">
+                                        <CheckCircle className="w-3 h-3 mr-1" />
+                                        Valid
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="font-medium">{item.admissionId}</TableCell>
+                                  <TableCell>{item.name}</TableCell>
+                                  <TableCell className="text-gray-600 dark:text-gray-400">{item.email || "-"}</TableCell>
+                                  <TableCell className="text-gray-600 dark:text-gray-400">{item.phone || "-"}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        {importProgress?.errors && importProgress.errors.length > 0 && (
+                          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                            <h4 className="font-medium text-red-800 dark:text-red-300 mb-2">Import Errors:</h4>
+                            <ul className="text-sm text-red-700 dark:text-red-300 space-y-1 max-h-32 overflow-y-auto">
+                              {importProgress.errors.map((error, index) => (
+                                <li key={index}>• {error}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center">
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Valid records: <strong>{importData.filter(item => !item.error).length}</strong> / {importData.length}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => {
+                                setShowImportPreview(false)
+                                setImportData([])
+                              }}
+                              disabled={isImporting}
+                              className="dark:border-slate-600 dark:text-slate-200"
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              onClick={executeImport}
+                              disabled={isImporting || importData.filter(item => !item.error).length === 0}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              {isImporting ? (
+                                <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                              ) : (
+                                <Upload className="w-4 h-4 mr-2" />
+                              )}
+                              {isImporting ? "Importing..." : `Import ${importData.filter(item => !item.error).length} Students`}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="bg-green-600 hover:bg-green-700">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Student
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md dark:bg-slate-800 dark:border-slate-700">
+                    <DialogHeader>
+                      <DialogTitle className="dark:text-white">Add New Student</DialogTitle>
+                      <DialogDescription className="dark:text-slate-300">Enter the student's information to add them to the database.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="admissionId" className="dark:text-white">Admission ID *</Label>
+                        <Input
+                          id="admissionId"
+                          placeholder="Enter admission ID"
+                          value={newStudent.admissionId}
+                          onChange={(e) => setNewStudent({ ...newStudent, admissionId: e.target.value })}
+                          className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="studentName" className="dark:text-white">Full Name *</Label>
+                        <Input
+                          id="studentName"
+                          placeholder="Enter student's full name"
+                          value={newStudent.name}
+                          onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                          className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="dark:text-white">Email (Optional)</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Enter email address"
+                          value={newStudent.email}
+                          onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                          className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="dark:text-white">Phone (Optional)</Label>
+                        <Input
+                          id="phone"
+                          placeholder="Enter phone number"
+                          value={newStudent.phone}
+                          onChange={(e) => setNewStudent({ ...newStudent, phone: e.target.value })}
+                          className="dark:bg-slate-700 dark:text-white dark:border-slate-600 dark:placeholder-gray-400"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        onClick={handleAddStudent}
+                        disabled={isAddingStudent || !newStudent.admissionId.trim() || !newStudent.name.trim()}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isAddingStudent ? (
+                          <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <Plus className="w-4 h-4 mr-2" />
+                        )}
+                        {isAddingStudent ? "Adding..." : "Add Student"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </CardHeader>
 

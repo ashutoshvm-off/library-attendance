@@ -257,6 +257,12 @@ export class EnhancedAppwriteService {
 
   // Enhanced student methods with offline support
   async createStudent(student: Omit<Student, "$id">): Promise<Student> {
+    // Check for duplicate admission ID across both local and remote data
+    const existingStudent = await this.getStudentByAdmissionId(student.admissionId)
+    if (existingStudent) {
+      throw new Error(`Student with admission ID "${student.admissionId}" already exists`)
+    }
+
     const localId = this.generateLocalId()
     const newStudent: Student = {
       $id: localId,
@@ -288,6 +294,12 @@ export class EnhancedAppwriteService {
         return response as unknown as Student
       } catch (error) {
         console.error("Failed to sync student to Appwrite, queuing for later:", error)
+        // If it's a duplicate error from Appwrite, remove from local storage
+        if (error instanceof Error && error.message.includes("already exists")) {
+          const filteredStudents = students.filter(s => s.$id !== localId)
+          this.setLocalData("students", filteredStudents)
+          throw error
+        }
         this.offlineSyncService.queueStudentCreate(student, localId)
       }
     } else {

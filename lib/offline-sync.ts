@@ -82,9 +82,21 @@ export class OfflineSyncService {
         return
       }
 
-      // Test Appwrite connectivity instead of generic health check
-      await this.appwriteService.retryConnection()
-      this.isOnline = this.appwriteService.isAppwriteConfigured()
+      // Test Appwrite connectivity by attempting a simple operation
+      const connectionStatus = this.appwriteService.getConnectionStatus()
+      
+      if (connectionStatus.isConnected) {
+        // Do a lightweight test to verify actual connectivity
+        try {
+          await this.appwriteService.getAllRecords()
+          this.isOnline = true
+        } catch (error) {
+          console.warn("Appwrite configured but connection test failed:", error)
+          this.isOnline = false
+        }
+      } else {
+        this.isOnline = false
+      }
       
       console.log("🔍 Connectivity check result:", this.isOnline ? "Connected" : "Disconnected")
     } catch (error) {
@@ -242,6 +254,15 @@ export class OfflineSyncService {
   private async syncStudent(item: SyncQueueItem): Promise<void> {
     switch (item.type) {
       case "create":
+        // Check for existing student before creating
+        const existingStudent = await this.appwriteService.getStudentByAdmissionId(item.data.admissionId)
+        if (existingStudent) {
+          console.warn(`Student with admission ID ${item.data.admissionId} already exists, skipping creation`)
+          // Update local record with server ID if it exists
+          this.updateLocalStudentId(item.localId!, existingStudent.$id!)
+          return
+        }
+        
         const newStudent = await this.appwriteService.createStudent(item.data)
         this.updateLocalStudentId(item.localId!, newStudent.$id!)
         break
@@ -356,16 +377,16 @@ export class OfflineSyncService {
   public getSyncStatus(): SyncStatus {
     const appwriteConfigured = this.appwriteService.isAppwriteConfigured()
     const connectionStatus = this.appwriteService.getConnectionStatus()
-    const isOnline = navigator.onLine && connectionStatus.isConnected
+    const isActuallyOnline = navigator.onLine && connectionStatus.isConnected && appwriteConfigured
 
     return {
-      isOnline: isOnline,
+      isOnline: isActuallyOnline,
       isSyncing: this.isSyncing,
       lastSyncTime: localStorage.getItem("library-last-sync"),
       pendingItems: this.syncQueue.length,
       failedItems: this.syncQueue.filter((item) => item.retryCount >= this.maxRetries).length,
       // Only consider truly synced if Appwrite is configured, connected, no pending items, and no failed items
-      isTrulySynced: appwriteConfigured && isOnline && this.syncQueue.length === 0 && !this.isSyncing,
+      isTrulySynced: appwriteConfigured && isActuallyOnline && this.syncQueue.length === 0 && !this.isSyncing,
     }
   }
 

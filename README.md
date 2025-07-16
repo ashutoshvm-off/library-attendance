@@ -395,13 +395,23 @@ APPWRITE_API_KEY=your-api-key-here
 
 2. **Check connection status**
    - Open the app in your browser
-   - Look for the connection status indicator
-   - It should show "Connected to Appwrite Cloud"
+   - Look for the "Sync Status" card on the dashboard
+   - It should show "Connected to Appwrite Cloud" with a green checkmark
+   - If it shows "Demo Mode" or "Local Only", check the troubleshooting section
 
 3. **Test functionality**
-   - Try logging in with demo credentials
+   - Try logging in with demo credentials (STAFF001 / library123)
    - Scan a student ID to create a record
    - Check if data appears in your Appwrite console
+   - Verify that the sync status shows "All data synced"
+
+4. **Verify real-time sync**
+   - Create a record in the app
+   - Check your Appwrite console to see if the record appears
+   - Try going offline (disconnect internet) and scan another ID
+   - When you come back online, records should sync automatically
+
+**Note**: The connection status is now more accurate and will show the true sync state between your app and Appwrite cloud.
 
 ## 👥 Demo Accounts
 

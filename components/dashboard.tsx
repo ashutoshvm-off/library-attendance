@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { EnhancedAppwriteService } from "@/lib/appwrite-enhanced"
+import { getOfflineSyncService } from "@/lib/offline-sync"
 import { useAuth } from "./auth-context"
 import { SyncStatus } from "./sync-status"
 
@@ -57,7 +57,8 @@ export function Dashboard({ staff }: DashboardProps) {
   const [records, setRecords] = useState<LibraryRecord[]>([])
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [loading, setLoading] = useState(false)
-  const [appwriteService] = useState(() => new EnhancedAppwriteService())
+  const [offlineSyncService] = useState(() => getOfflineSyncService())
+  const [appwriteService] = useState(() => offlineSyncService.getAppwriteService())
   const { logout } = useAuth()
   const [displayedStudentName, setDisplayedStudentName] = useState<string>("")
   const [displayedStudentId, setDisplayedStudentId] = useState<string>("")
@@ -142,6 +143,8 @@ export function Dashboard({ staff }: DashboardProps) {
       return
     }
 
+    const admissionId = barcode.trim().toUpperCase()
+
     // Clear the hide timer since we're about to scan
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current)
@@ -151,31 +154,17 @@ export function Dashboard({ staff }: DashboardProps) {
     try {
       const today = format(new Date(), "yyyy-MM-dd")
       
-      // Get fresh records to ensure we have the latest data
-      const todaysRecords = await appwriteService.getRecordsByDate(today)
+      // Get current student status using the enhanced method
+      const studentStatus = await appwriteService.getStudentCurrentStatus(admissionId, today)
       
-      // Find any existing record for this student today
-      const existingRecord = todaysRecords.find(
-        (record) => record.admissionId === barcode.trim() && record.date === today
-      )
-
-      // Sort records by time to get the most recent one
-      const studentRecordsToday = todaysRecords
-        .filter(record => record.admissionId === barcode.trim() && record.date === today)
-        .sort((a, b) => {
-          const timeA = new Date(a.checkInTime || a.date).getTime()
-          const timeB = new Date(b.checkInTime || b.date).getTime()
-          return timeB - timeA // Most recent first
-        })
-
-      const mostRecentRecord = studentRecordsToday[0]
-
-      if (mostRecentRecord && mostRecentRecord.status === "checked-in") {
+      if (studentStatus.isCheckedIn) {
         // Student is currently checked in, so check them out
-        await handleCheckOut(mostRecentRecord)
+        if (studentStatus.lastRecord) {
+          await handleCheckOut(studentStatus.lastRecord)
+        }
       } else {
         // Student is not checked in (or no record exists), so check them in
-        await handleCheckIn()
+        await handleCheckIn(admissionId)
       }
     } catch (error) {
       console.error("Error processing scan:", error)
@@ -189,32 +178,16 @@ export function Dashboard({ staff }: DashboardProps) {
     }
   }
 
-  const handleCheckIn = async () => {
+  const handleCheckIn = async (admissionId: string) => {
     try {
       const today = format(new Date(), "yyyy-MM-dd")
       
-      // Double-check that student isn't already checked in
-      const existingCheckedIn = records.find(
-        (record) => record.admissionId === barcode.trim() && 
-                   record.date === today && 
-                   record.status === "checked-in"
-      )
-
-      if (existingCheckedIn) {
-        toast({
-          title: "Already Checked In",
-          description: `${existingCheckedIn.studentName} is already checked in today`,
-          variant: "destructive",
-        })
-        setBarcode("")
-        return
-      }
-
-      const studentData = await appwriteService.getStudentByAdmissionId(barcode.trim())
+      // Get student data or create if doesn't exist
+      const studentData = await appwriteService.getStudentByAdmissionId(admissionId)
 
       const newRecord: LibraryRecord = {
-        admissionId: barcode.trim(),
-        studentName: studentData?.name || `Student ${barcode.trim()}`,
+        admissionId: admissionId,
+        studentName: studentData?.name || `Student ${admissionId}`,
         checkInTime: new Date().toISOString(),
         date: today,
         status: "checked-in",
@@ -222,8 +195,10 @@ export function Dashboard({ staff }: DashboardProps) {
 
       await appwriteService.createRecord(newRecord)
 
-      // Show success message with offline indicator if needed
-      const isOnline = navigator.onLine && appwriteService.isAppwriteConfigured()
+      // Show success message with sync status
+      const connectionStatus = appwriteService.getConnectionStatus()
+      const isOnline = connectionStatus.isConnected
+      
       toast({
         title: "✅ Check-in Successful",
         description: `${newRecord.studentName} checked in at ${format(new Date(), "HH:mm:ss")}${!isOnline ? " (Saved locally)" : ""}`,
@@ -231,7 +206,7 @@ export function Dashboard({ staff }: DashboardProps) {
 
       // Update the displayed student info after successful scan
       setDisplayedStudentName(newRecord.studentName)
-      setDisplayedStudentId(barcode.trim())
+      setDisplayedStudentId(admissionId)
       setShowStudentCard(true)
 
       // Start the 5-second hide timer
@@ -249,7 +224,7 @@ export function Dashboard({ staff }: DashboardProps) {
       console.error("Error during check-in:", error)
       toast({
         title: "Check-in Failed",
-        description: "Unable to process check-in",
+        description: error instanceof Error ? error.message : "Unable to process check-in",
         variant: "destructive",
       })
     }
@@ -276,8 +251,10 @@ export function Dashboard({ staff }: DashboardProps) {
 
       await appwriteService.updateRecord(record.$id!, updatedRecord)
 
-      // Show success message with offline indicator if needed
-      const isOnline = navigator.onLine && appwriteService.isAppwriteConfigured()
+      // Show success message with sync status
+      const connectionStatus = appwriteService.getConnectionStatus()
+      const isOnline = connectionStatus.isConnected
+      
       toast({
         title: "✅ Check-out Successful",
         description: `${record.studentName} checked out at ${format(new Date(), "HH:mm:ss")}${!isOnline ? " (Saved locally)" : ""}`,
@@ -285,7 +262,7 @@ export function Dashboard({ staff }: DashboardProps) {
 
       // Update the displayed student info after successful scan
       setDisplayedStudentName(record.studentName)
-      setDisplayedStudentId(barcode.trim())
+      setDisplayedStudentId(record.admissionId)
       setShowStudentCard(true)
 
       // Start the 5-second hide timer

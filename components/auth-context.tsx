@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
-import { AppwriteService } from "@/lib/appwrite"
+import { getOfflineSyncService } from "@/lib/offline-sync"
 
 interface Staff {
   id: string
@@ -85,7 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [staff, setStaff] = useState<Staff | null>(null)
   const [currentSession, setCurrentSession] = useState<LoginRecord | null>(null)
-  const [appwriteService] = useState(() => new AppwriteService())
+  const [offlineSyncService] = useState(() => getOfflineSyncService())
+  const [appwriteService] = useState(() => offlineSyncService.getAppwriteService())
 
   useEffect(() => {
     // Check for existing session
@@ -143,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        // Save login record to database
+        // Save login record to database using offline sync service
         const savedRecord = await appwriteService.createLoginRecord(loginRecord)
         setCurrentSession(savedRecord)
         localStorage.setItem("library-session", JSON.stringify(savedRecord))
